@@ -26,11 +26,15 @@ create table if not exists public.categories (
   color text not null default '#3b82f6',
   icon text,
   is_default boolean not null default false,
-  created_at timestamptz not null default now(),
-  unique (user_id, kind, lower(name))
+  created_at timestamptz not null default now()
 );
 
 create index if not exists categories_user_idx on public.categories (user_id);
+-- Case-insensitive uniqueness per user and kind.
+-- A table-level UNIQUE constraint cannot contain an expression such as lower(name),
+-- so this must be a unique index instead.
+create unique index if not exists categories_user_kind_name_key
+  on public.categories (user_id, kind, lower(name));
 
 -- ---------------------------------------------------------------------------
 -- 3. transactions - the ledger
@@ -61,7 +65,7 @@ create table if not exists public.budgets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   category_id uuid not null references public.categories (id) on delete cascade,
-  month date not null check (day(month) = 1),
+  month date not null check (extract(day from month) = 1),
   limit_amount numeric(14, 2) not null check (limit_amount > 0),
   created_at timestamptz not null default now(),
   unique (user_id, category_id, month)
@@ -112,6 +116,31 @@ alter table public.transactions enable row level security;
 alter table public.budgets enable row level security;
 alter table public.savings_goals enable row level security;
 alter table public.goal_contributions enable row level security;
+
+-- Make this migration safe to re-run: drop existing policies before creating them.
+drop policy if exists "profiles_select_own" on public.profiles;
+drop policy if exists "profiles_insert_own" on public.profiles;
+drop policy if exists "profiles_update_own" on public.profiles;
+drop policy if exists "categories_select_own" on public.categories;
+drop policy if exists "categories_insert_own" on public.categories;
+drop policy if exists "categories_update_own" on public.categories;
+drop policy if exists "categories_delete_own" on public.categories;
+drop policy if exists "transactions_select_own" on public.transactions;
+drop policy if exists "transactions_insert_own" on public.transactions;
+drop policy if exists "transactions_update_own" on public.transactions;
+drop policy if exists "transactions_delete_own" on public.transactions;
+drop policy if exists "budgets_select_own" on public.budgets;
+drop policy if exists "budgets_insert_own" on public.budgets;
+drop policy if exists "budgets_update_own" on public.budgets;
+drop policy if exists "budgets_delete_own" on public.budgets;
+drop policy if exists "goals_select_own" on public.savings_goals;
+drop policy if exists "goals_insert_own" on public.savings_goals;
+drop policy if exists "goals_update_own" on public.savings_goals;
+drop policy if exists "goals_delete_own" on public.savings_goals;
+drop policy if exists "contribs_select_own" on public.goal_contributions;
+drop policy if exists "contribs_insert_own" on public.goal_contributions;
+drop policy if exists "contribs_update_own" on public.goal_contributions;
+drop policy if exists "contribs_delete_own" on public.goal_contributions;
 
 -- profiles: read/insert own row; update own row
 create policy "profiles_select_own" on public.profiles
@@ -295,7 +324,10 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 10. View: monthly summary (used by dashboard + analytics)
 -- ---------------------------------------------------------------------------
-create or replace view public.monthly_summary as
+-- Views cannot have RLS policies applied directly. With security_invoker, the
+-- view runs with the caller's permissions, so RLS on public.transactions applies.
+create or replace view public.monthly_summary
+with (security_invoker = true) as
 select
   t.user_id,
   date_trunc('month', t.occurred_on)::date as month,
@@ -304,7 +336,3 @@ select
   count(*) as count
 from public.transactions t
 group by t.user_id, date_trunc('month', t.occurred_on)::date, t.type;
-
-alter view public.monthly_summary enable row level security;
-create policy "monthly_summary_select_own" on public.monthly_summary
-  for select using ((select auth.uid()) = user_id);
