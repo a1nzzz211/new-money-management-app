@@ -12,7 +12,13 @@ import { signOut } from "@/lib/auth/actions";
 import { LogOutIcon } from "lucide-react";
 import type { Profile } from "@/lib/types";
 
-export function Topbar({ profile }: { profile: Profile | null }) {
+export function Topbar({
+  profile,
+  leftElement,
+}: {
+  profile: Profile | null;
+  leftElement?: React.ReactNode;
+}) {
   const name = profile?.display_name ?? "Anda";
   const initials = (profile?.display_name ?? "A")
     .split(" ")
@@ -22,7 +28,8 @@ export function Topbar({ profile }: { profile: Profile | null }) {
     .toUpperCase();
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-end border-b px-4 lg:px-6">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 lg:px-6 bg-card/60 backdrop-blur">
+      <div className="flex items-center gap-2">{leftElement}</div>
       <DropdownMenu>
         <DropdownMenuTrigger
           render={

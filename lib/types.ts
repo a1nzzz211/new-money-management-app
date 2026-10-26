@@ -2,16 +2,16 @@ export type TransactionType = "income" | "expense" | "savings";
 export type CategoryKind = "income" | "expense" | "savings";
 export type GoalStatus = "active" | "achieved" | "archived";
 
-export interface Profile {
+export type Profile = {
   id: string;
   email: string | null;
   display_name: string | null;
   avatar_url: string | null;
   currency: string;
   created_at: string;
-}
+};
 
-export interface Category {
+export type Category = {
   id: string;
   user_id: string;
   name: string;
@@ -20,9 +20,9 @@ export interface Category {
   icon: string | null;
   is_default: boolean;
   created_at: string;
-}
+};
 
-export interface Transaction {
+export type Transaction = {
   id: string;
   user_id: string;
   category_id: string | null;
@@ -33,9 +33,9 @@ export interface Transaction {
   created_at: string;
   // join
   category?: Category | null;
-}
+};
 
-export interface Budget {
+export type Budget = {
   id: string;
   user_id: string;
   category_id: string;
@@ -43,9 +43,9 @@ export interface Budget {
   limit_amount: number;
   created_at: string;
   category?: Category | null;
-}
+};
 
-export interface SavingsGoal {
+export type SavingsGoal = {
   id: string;
   user_id: string;
   name: string;
@@ -53,9 +53,9 @@ export interface SavingsGoal {
   deadline: string | null;
   status: GoalStatus;
   created_at: string;
-}
+};
 
-export interface GoalContribution {
+export type GoalContribution = {
   id: string;
   user_id: string;
   goal_id: string;
@@ -63,7 +63,7 @@ export interface GoalContribution {
   amount: number;
   contributed_on: string;
   created_at: string;
-}
+};
 
 // Minimal Supabase Database generic shape used by createServerClient<Database>.
 export interface Database {
@@ -73,31 +73,37 @@ export interface Database {
         Row: Profile;
         Insert: Partial<Profile>;
         Update: Partial<Profile>;
+        Relationships: [];
       };
       categories: {
         Row: Category;
         Insert: Partial<Category>;
         Update: Partial<Category>;
+        Relationships: [];
       };
       transactions: {
         Row: Transaction;
         Insert: Partial<Transaction>;
         Update: Partial<Transaction>;
+        Relationships: [];
       };
       budgets: {
         Row: Budget;
         Insert: Partial<Budget>;
         Update: Partial<Budget>;
+        Relationships: [];
       };
       savings_goals: {
         Row: SavingsGoal;
         Insert: Partial<SavingsGoal>;
         Update: Partial<SavingsGoal>;
+        Relationships: [];
       };
       goal_contributions: {
         Row: GoalContribution;
         Insert: Partial<GoalContribution>;
         Update: Partial<GoalContribution>;
+        Relationships: [];
       };
     };
     Views: {
@@ -109,6 +115,7 @@ export interface Database {
           total: number;
           count: number;
         };
+        Relationships: [];
       };
     };
     Functions: {

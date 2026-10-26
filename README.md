@@ -61,6 +61,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ### 4. Database Setup
 
 Apply the SQL migration file to your Supabase project:
+
 1. Go to the Supabase Dashboard $\rightarrow$ **SQL Editor**.
 2. Open `supabase/migrations/0001_init.sql` and execute the script.
 3. Configure Google OAuth under **Authentication** $\rightarrow$ **Providers**.
@@ -83,5 +84,3 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `npm run start`: Start production server.
 
 ## License
-
-MIT

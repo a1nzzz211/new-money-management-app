@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/types";
+import type { createClient } from "@/lib/supabase/server";
 import type {
   Budget,
   Category,
@@ -10,7 +9,7 @@ import type {
 } from "@/lib/types";
 import { akhirBulan, awalBulan } from "@/lib/format";
 
-type Client = SupabaseClient<Database>;
+type Client = Awaited<ReturnType<typeof createClient>>;
 
 export type TransactionWithCategory = Transaction & {
   category: Pick<Category, "id" | "name" | "color" | "kind"> | null;
@@ -37,7 +36,7 @@ export async function getProfile(client: Client): Promise<Profile | null> {
     .select("*")
     .eq("id", user.id)
     .maybeSingle();
-  return (data as Profile) ?? null;
+  return (data as unknown as Profile) ?? null;
 }
 
 export async function getUserId(client: Client): Promise<string | null> {
@@ -231,7 +230,9 @@ export async function getGoalTotals(
     .from("goal_contributions")
     .select("goal_id, amount");
   const totals: Record<string, number> = {};
-  for (const row of data ?? []) {
+  const rows =
+    (data as unknown as Array<{ goal_id: string; amount: number }>) ?? [];
+  for (const row of rows) {
     totals[row.goal_id] = (totals[row.goal_id] ?? 0) + Number(row.amount);
   }
   return totals;
