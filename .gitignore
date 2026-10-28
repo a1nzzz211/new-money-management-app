@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local AI assistant configuration
+AGENTS.md
+CLAUDE.md
+.opencode/
+.claude/
