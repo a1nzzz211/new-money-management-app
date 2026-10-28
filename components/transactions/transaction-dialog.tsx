@@ -12,12 +12,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createTransaction, updateTransaction } from "@/lib/actions/transactions";
+import {
+  createTransaction,
+  updateTransaction,
+} from "@/lib/actions/transactions";
 import type { Category, TransactionType } from "@/lib/types";
 import type { TransactionWithCategory } from "@/lib/data";
 import { hariIni, rupiah } from "@/lib/format";
 import { toast } from "sonner";
-import { Loader2Icon, ArrowDownLeftIcon, ArrowUpRightIcon, PiggyBankIcon } from "lucide-react";
+import {
+  Loader2Icon,
+  ArrowDownLeftIcon,
+  ArrowUpRightIcon,
+  PiggyBankIcon,
+} from "lucide-react";
 
 interface TransactionDialogProps {
   open: boolean;
@@ -43,7 +51,7 @@ function TransactionFormContent({
   const isEditing = Boolean(initialData);
 
   const [type, setType] = React.useState<TransactionType>(
-    initialData?.type ?? "expense"
+    initialData?.type ?? "expense",
   );
 
   const initialCategoryId = React.useMemo(() => {
@@ -54,13 +62,13 @@ function TransactionFormContent({
 
   const [categoryId, setCategoryId] = React.useState<string>(initialCategoryId);
   const [amount, setAmount] = React.useState<string>(
-    initialData ? String(initialData.amount) : ""
+    initialData ? String(initialData.amount) : "",
   );
   const [occurredOn, setOccurredOn] = React.useState<string>(
-    initialData?.occurred_on ?? hariIni()
+    initialData?.occurred_on ?? hariIni(),
   );
   const [description, setDescription] = React.useState<string>(
-    initialData?.description ?? ""
+    initialData?.description ?? "",
   );
   const [isPending, startTransition] = React.useTransition();
 
@@ -106,9 +114,10 @@ function TransactionFormContent({
         description: description.trim(),
       };
 
-      const res = isEditing && initialData
-        ? await updateTransaction(initialData.id, payload)
-        : await createTransaction(payload);
+      const res =
+        isEditing && initialData
+          ? await updateTransaction(initialData.id, payload)
+          : await createTransaction(payload);
 
       if (!res.ok) {
         toast.error(res.error);
@@ -118,7 +127,7 @@ function TransactionFormContent({
       toast.success(
         isEditing
           ? "Transaksi berhasil diperbarui"
-          : "Transaksi berhasil dicatat"
+          : "Transaksi berhasil dicatat",
       );
       onClose();
       onSuccess?.();
@@ -177,7 +186,10 @@ function TransactionFormContent({
       {/* Amount */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <Label htmlFor="amount" className="text-xs font-medium text-muted-foreground">
+          <Label
+            htmlFor="amount"
+            className="text-xs font-medium text-muted-foreground"
+          >
             Nominal (Rp)
           </Label>
           {!isNaN(parsedAmount) && parsedAmount > 0 && (
@@ -202,7 +214,10 @@ function TransactionFormContent({
 
       {/* Category */}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="category" className="text-xs font-medium text-muted-foreground">
+        <Label
+          htmlFor="category"
+          className="text-xs font-medium text-muted-foreground"
+        >
           Kategori
         </Label>
         <div className="relative">
@@ -233,7 +248,10 @@ function TransactionFormContent({
 
       {/* Date */}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="occurredOn" className="text-xs font-medium text-muted-foreground">
+        <Label
+          htmlFor="occurredOn"
+          className="text-xs font-medium text-muted-foreground"
+        >
           Tanggal Transaksi
         </Label>
         <Input
@@ -248,7 +266,10 @@ function TransactionFormContent({
 
       {/* Description */}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="description" className="text-xs font-medium text-muted-foreground">
+        <Label
+          htmlFor="description"
+          className="text-xs font-medium text-muted-foreground"
+        >
           Catatan / Keterangan (Opsional)
         </Label>
         <Input
@@ -316,4 +337,3 @@ export function TransactionDialog({
     </Dialog>
   );
 }
-

@@ -63,7 +63,11 @@ export function DeleteTransactionDialog({
 
         <div className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1">
           <div className="flex justify-between font-medium text-foreground">
-            <span>{transaction.description || transaction.category?.name || "Transaksi"}</span>
+            <span>
+              {transaction.description ||
+                transaction.category?.name ||
+                "Transaksi"}
+            </span>
             <span className="tabular-nums font-semibold">
               {rupiah(Number(transaction.amount))}
             </span>
@@ -89,7 +93,9 @@ export function DeleteTransactionDialog({
             disabled={isPending}
             onClick={handleDelete}
           >
-            {isPending && <Loader2Icon className="mr-1.5 size-4 animate-spin" />}
+            {isPending && (
+              <Loader2Icon className="mr-1.5 size-4 animate-spin" />
+            )}
             Hapus Transaksi
           </Button>
         </AlertDialogFooter>
@@ -97,4 +103,3 @@ export function DeleteTransactionDialog({
     </AlertDialog>
   );
 }
-
