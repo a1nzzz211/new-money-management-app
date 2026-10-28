@@ -52,23 +52,25 @@ export function TrendChart({ data }: TrendChartProps) {
             dataKey="name"
             tickLine={false}
             axisLine={false}
-            tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
           />
           <YAxis
             tickLine={false}
             axisLine={false}
             tickFormatter={(v: number) => rupiahShort(v)}
-            tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
           />
           <Tooltip
             formatter={(value: unknown) => [rupiah(Number(value)), ""]}
             contentStyle={{
-              backgroundColor: "hsl(var(--popover))",
-              borderColor: "hsl(var(--border))",
+              backgroundColor: "#ffffff",
+              borderColor: "var(--border)",
               borderRadius: "0.5rem",
               fontSize: "0.875rem",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+              color: "#0f172a",
             }}
+            labelStyle={{ color: "#0f172a", fontWeight: 600 }}
           />
           <Legend
             verticalAlign="top"

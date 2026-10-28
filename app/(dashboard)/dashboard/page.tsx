@@ -69,6 +69,7 @@ export default async function DashboardPage() {
     savings: 0,
     net: 0,
     savingsRate: 0,
+    netMargin: 0,
   };
 
   const prevTotals = totalsByMonth(prevMonthTxs)[prevMonth] ?? {
@@ -78,6 +79,7 @@ export default async function DashboardPage() {
     savings: 0,
     net: 0,
     savingsRate: 0,
+    netMargin: 0,
   };
 
   const expenseMoM = momChange(curTotals.expense, prevTotals.expense);
@@ -96,6 +98,7 @@ export default async function DashboardPage() {
         savings: 0,
         net: 0,
         savingsRate: 0,
+        netMargin: 0,
       },
   );
 

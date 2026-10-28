@@ -1,7 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import {
+  requireUser,
+  revalidateFinance,
+  verifyCategoryKind,
+} from "@/lib/actions/helpers";
 import {
   transactionSchema,
   type ActionResult,
@@ -19,19 +22,22 @@ export async function createTransaction(
     };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
+  const { supabase, user } = auth;
 
-  if (!user) {
-    return { ok: false, error: "Sesi tidak ditemukan, silakan masuk kembali" };
-  }
+  const category = await verifyCategoryKind(
+    supabase,
+    user.id,
+    parsed.data.categoryId,
+    parsed.data.type,
+  );
+  if (!category.ok) return category;
 
   const { error } = await supabase.from("transactions").insert({
     user_id: user.id,
     type: parsed.data.type,
-    category_id: parsed.data.categoryId,
+    category_id: category.category.id,
     amount: parsed.data.amount,
     description: parsed.data.description?.trim() || null,
     occurred_on: parsed.data.occurredOn,
@@ -41,10 +47,7 @@ export async function createTransaction(
     return { ok: false, error: error.message };
   }
 
-  revalidatePath("/transaksi");
-  revalidatePath("/dashboard");
-  revalidatePath("/analisis");
-  revalidatePath("/histori");
+  revalidateFinance("transactions");
 
   return { ok: true };
 }
@@ -61,20 +64,23 @@ export async function updateTransaction(
     };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
+  const { supabase, user } = auth;
 
-  if (!user) {
-    return { ok: false, error: "Sesi tidak ditemukan, silakan masuk kembali" };
-  }
+  const category = await verifyCategoryKind(
+    supabase,
+    user.id,
+    parsed.data.categoryId,
+    parsed.data.type,
+  );
+  if (!category.ok) return category;
 
   const { error } = await supabase
     .from("transactions")
     .update({
       type: parsed.data.type,
-      category_id: parsed.data.categoryId,
+      category_id: category.category.id,
       amount: parsed.data.amount,
       description: parsed.data.description?.trim() || null,
       occurred_on: parsed.data.occurredOn,
@@ -86,23 +92,15 @@ export async function updateTransaction(
     return { ok: false, error: error.message };
   }
 
-  revalidatePath("/transaksi");
-  revalidatePath("/dashboard");
-  revalidatePath("/analisis");
-  revalidatePath("/histori");
+  revalidateFinance("transactions");
 
   return { ok: true };
 }
 
 export async function deleteTransaction(id: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { ok: false, error: "Sesi tidak ditemukan, silakan masuk kembali" };
-  }
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
+  const { supabase, user } = auth;
 
   const { error } = await supabase
     .from("transactions")
@@ -114,11 +112,7 @@ export async function deleteTransaction(id: string): Promise<ActionResult> {
     return { ok: false, error: error.message };
   }
 
-  revalidatePath("/transaksi");
-  revalidatePath("/dashboard");
-  revalidatePath("/analisis");
-  revalidatePath("/histori");
+  revalidateFinance("transactions");
 
   return { ok: true };
 }
-

@@ -5,6 +5,8 @@ A modern personal finance and expense tracking web application built with **Next
 ## Features
 
 - 🔐 **Supabase Authentication**: Seamless Google OAuth login and server-side session management.
+- 🎯 **Budget Management**: Set monthly spending limits per expense category, track usage with progress bars, and get clear "Aman", "Mendekati Batas", or "Melebihi Batas" statuses.
+- 🐷 **Savings Goals**: Create financial targets with optional deadlines, record contributions that also appear as savings transactions, and track progress with status tabs and monthly estimates.
 - 📊 **Financial Dashboard**:
   - Net balance, income, expense, and savings metrics.
   - Month-over-month (MoM) spending comparison.
@@ -64,7 +66,8 @@ Apply the SQL migration file to your Supabase project:
 
 1. Go to the Supabase Dashboard $\rightarrow$ **SQL Editor**.
 2. Open `supabase/migrations/0001_init.sql` and execute the script.
-3. Configure Google OAuth under **Authentication** $\rightarrow$ **Providers**.
+3. If your project already had the initial schema applied, run `supabase/migrations/0002_hardening.sql` as well (safe to re-run).
+4. Configure Google OAuth under **Authentication** $\rightarrow$ **Providers**.
 
 ### 5. Running Locally
 

@@ -41,9 +41,7 @@ export function TransactionStats({ transactions }: TransactionStatsProps) {
           </div>
           <p
             className={`mt-1.5 text-base sm:text-lg font-bold tabular-nums ${
-              net >= 0
-                ? "text-foreground"
-                : "text-red-600 dark:text-red-400"
+              net >= 0 ? "text-foreground" : "text-red-600 dark:text-red-400"
             }`}
           >
             {rupiah(net)}
@@ -104,4 +102,3 @@ export function TransactionStats({ transactions }: TransactionStatsProps) {
     </div>
   );
 }
-

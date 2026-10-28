@@ -7,7 +7,32 @@ export interface MonthTotals {
   expense: number;
   savings: number;
   net: number; // income - expense - savings
-  savingsRate: number; // net / income (0 when income === 0)
+  savingsRate: number; // savings / income (0 when income === 0)
+  netMargin: number; // net / income (0 when income === 0)
+}
+
+function createMonthTotals(month: string): MonthTotals {
+  return {
+    month,
+    income: 0,
+    expense: 0,
+    savings: 0,
+    net: 0,
+    savingsRate: 0,
+    netMargin: 0,
+  };
+}
+
+/** Shared finalization so totalsByMonth/totalsFromSummary cannot drift. */
+function finalizeTotals(
+  acc: Record<string, MonthTotals>,
+): Record<string, MonthTotals> {
+  for (const m of Object.values(acc)) {
+    m.net = m.income - m.expense - m.savings;
+    m.savingsRate = m.income > 0 ? m.savings / m.income : 0;
+    m.netMargin = m.income > 0 ? m.net / m.income : 0;
+  }
+  return acc;
 }
 
 /** Aggregate raw transactions into per-month totals. */
@@ -17,23 +42,12 @@ export function totalsByMonth(
   const acc: Record<string, MonthTotals> = {};
   for (const t of txs) {
     const key = t.occurred_on.slice(0, 7);
-    const m = (acc[key] ??= {
-      month: key,
-      income: 0,
-      expense: 0,
-      savings: 0,
-      net: 0,
-      savingsRate: 0,
-    });
+    const m = (acc[key] ??= createMonthTotals(key));
     if (t.type === "income") m.income += Number(t.amount);
     else if (t.type === "expense") m.expense += Number(t.amount);
     else m.savings += Number(t.amount);
   }
-  for (const m of Object.values(acc)) {
-    m.net = m.income - m.expense - m.savings;
-    m.savingsRate = m.income > 0 ? m.net / m.income : 0;
-  }
-  return acc;
+  return finalizeTotals(acc);
 }
 
 /** Aggregate the monthly_summary view rows into MonthTotals keyed by yyyy-MM. */
@@ -43,23 +57,12 @@ export function totalsFromSummary(
   const acc: Record<string, MonthTotals> = {};
   for (const r of rows) {
     const key = r.month.slice(0, 7);
-    const m = (acc[key] ??= {
-      month: key,
-      income: 0,
-      expense: 0,
-      savings: 0,
-      net: 0,
-      savingsRate: 0,
-    });
+    const m = (acc[key] ??= createMonthTotals(key));
     if (r.type === "income") m.income += Number(r.total);
     else if (r.type === "expense") m.expense += Number(r.total);
     else m.savings += Number(r.total);
   }
-  for (const m of Object.values(acc)) {
-    m.net = m.income - m.expense - m.savings;
-    m.savingsRate = m.income > 0 ? m.net / m.income : 0;
-  }
-  return acc;
+  return finalizeTotals(acc);
 }
 
 export interface CategorySlice {
@@ -106,12 +109,15 @@ export function avgDaily(expense: number, days: number): number {
   return days > 0 ? expense / days : 0;
 }
 
+export type BudgetHealth = "safe" | "warning" | "over";
+
 export interface BudgetStatus {
   budget: BudgetWithCategory;
   spent: number;
   remaining: number;
   usedPct: number; // 0..n (can exceed 1)
   over: boolean;
+  status: BudgetHealth;
 }
 
 /** Compute spent/remaining per budget against a month's transactions. */
@@ -128,12 +134,21 @@ export function budgetStatuses(
   return budgets.map((b) => {
     const spent = spentByCat[b.category_id] ?? 0;
     const limit = Number(b.limit_amount);
+    const usedPct = limit > 0 ? spent / limit : 0;
+    const over = spent > limit;
+    const status: BudgetHealth = over
+      ? "over"
+      : usedPct >= 0.8
+        ? "warning"
+        : "safe";
+
     return {
       budget: b,
       spent,
       remaining: limit - spent,
-      usedPct: limit > 0 ? spent / limit : 0,
-      over: spent >= limit,
+      usedPct,
+      over,
+      status,
     };
   });
 }

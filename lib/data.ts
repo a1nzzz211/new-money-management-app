@@ -7,7 +7,12 @@ import type {
   Transaction,
   TransactionType,
 } from "@/lib/types";
-import { akhirBulan, awalBulan } from "@/lib/format";
+import {
+  akhirBulan,
+  awalBulan,
+  bulanIni,
+  rentangBulan,
+} from "@/lib/format";
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 
@@ -21,20 +26,31 @@ export type BudgetWithCategory = Budget & {
 
 export type GoalWithProgress = SavingsGoal & {
   saved: number;
+  unlinkedContributions: number;
 };
 
 // ---------------------------------------------------------------------------
 // Profile
 // ---------------------------------------------------------------------------
-export async function getProfile(client: Client): Promise<Profile | null> {
-  const {
-    data: { user },
-  } = await client.auth.getUser();
-  if (!user) return null;
+export async function getProfile(
+  client: Client,
+  userId?: string,
+): Promise<Profile | null> {
+  let id = userId;
+
+  if (!id) {
+    const {
+      data: { user },
+    } = await client.auth.getUser();
+    id = user?.id;
+  }
+
+  if (!id) return null;
+
   const { data } = await client
     .from("profiles")
     .select("*")
-    .eq("id", user.id)
+    .eq("id", id)
     .maybeSingle();
   return (data as unknown as Profile) ?? null;
 }
@@ -166,10 +182,9 @@ export async function getMonthlySummary(
   client: Client,
   months: number,
 ): Promise<MonthlySummaryRow[]> {
-  const since = awalBulan(
-    // go back (months-1) months from current month
-    monthKeyMonthsAgo(months - 1),
-  );
+  // Use the same local-month helpers as the rest of the app so the range
+  // never shifts around month boundaries (see R10 in TASK.md).
+  const since = awalBulan(rentangBulan(bulanIni(), Math.max(1, months))[0]);
   const { data } = await client
     .from("monthly_summary")
     .select("month, type, total, count")
@@ -187,13 +202,6 @@ function normalizeSummary(
     total: Number(r.total ?? 0),
     count: Number(r.count ?? 0),
   }));
-}
-
-function monthKeyMonthsAgo(n: number): string {
-  const d = new Date();
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() - n);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,12 +246,41 @@ export async function getGoalTotals(
   return totals;
 }
 
+/** Count contributions whose linked savings transaction was deleted. */
+export async function getGoalUnlinkedContributions(
+  client: Client,
+): Promise<Record<string, number>> {
+  const { data } = await client
+    .from("goal_contributions")
+    .select("goal_id, transaction_id");
+
+  const counts: Record<string, number> = {};
+  const rows =
+    (data as unknown as Array<{
+      goal_id: string;
+      transaction_id: string | null;
+    }>) ?? [];
+
+  for (const row of rows) {
+    if (row.transaction_id === null) {
+      counts[row.goal_id] = (counts[row.goal_id] ?? 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
 export async function listGoalsWithProgress(
   client: Client,
 ): Promise<GoalWithProgress[]> {
-  const [goals, totals] = await Promise.all([
+  const [goals, totals, unlinked] = await Promise.all([
     listGoals(client),
     getGoalTotals(client),
+    getGoalUnlinkedContributions(client),
   ]);
-  return goals.map((g) => ({ ...g, saved: totals[g.id] ?? 0 }));
+  return goals.map((g) => ({
+    ...g,
+    saved: totals[g.id] ?? 0,
+    unlinkedContributions: unlinked[g.id] ?? 0,
+  }));
 }

@@ -39,7 +39,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
 
       router.push(`${pathname}?${params.toString()}`);
     },
-    [router, pathname, searchParams]
+    [router, pathname, searchParams],
   );
 
   const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -54,7 +54,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
   };
 
   const hasActiveFilters = Boolean(
-    currentMonth || currentType || currentCategory || currentSearch
+    currentMonth || currentType || currentCategory || currentSearch,
   );
 
   // Month options for the past 12 months
@@ -168,4 +168,3 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
     </div>
   );
 }
-

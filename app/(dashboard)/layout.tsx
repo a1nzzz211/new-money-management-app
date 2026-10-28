@@ -17,7 +17,7 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const profile = await getProfile(supabase);
+  const profile = await getProfile(supabase, user.id);
 
   return <DashboardShell profile={profile}>{children}</DashboardShell>;
 }

@@ -26,6 +26,12 @@ export function BudgetSummaryWidget({ budgets }: BudgetSummaryWidgetProps) {
       {budgets.slice(0, 3).map((item) => {
         const pct = Math.round(item.usedPct * 100);
         const limit = Number(item.budget.limit_amount);
+        const barColor =
+          item.status === "over"
+            ? "bg-red-500"
+            : item.status === "warning"
+              ? "bg-amber-500"
+              : "bg-emerald-500";
 
         return (
           <div key={item.budget.id} className="flex flex-col gap-1.5">
@@ -42,7 +48,13 @@ export function BudgetSummaryWidget({ budgets }: BudgetSummaryWidgetProps) {
                 </span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
-                <span className={item.over ? "text-red-600 font-semibold" : ""}>
+                <span
+                  className={
+                    item.status === "over"
+                      ? "text-red-600 font-semibold"
+                      : ""
+                  }
+                >
                   {rupiah(item.spent)}
                 </span>
                 <span>/</span>
@@ -52,18 +64,12 @@ export function BudgetSummaryWidget({ budgets }: BudgetSummaryWidgetProps) {
 
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
-                className={`h-full rounded-full transition-all ${
-                  item.over
-                    ? "bg-red-500"
-                    : pct > 85
-                      ? "bg-amber-500"
-                      : "bg-emerald-500"
-                }`}
+                className={`h-full rounded-full transition-all ${barColor}`}
                 style={{ width: `${Math.min(pct, 100)}%` }}
               />
             </div>
 
-            {item.over && (
+            {item.status === "over" && (
               <p className="text-[11px] text-red-600 font-medium">
                 Melebihi anggaran sebesar {rupiah(item.spent - limit)}
               </p>

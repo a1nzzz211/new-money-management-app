@@ -1,6 +1,7 @@
 import {
   endOfMonth,
   format,
+  isValid,
   parseISO,
   startOfMonth,
   subMonths,
@@ -50,6 +51,14 @@ export function namaBulanPendek(monthKey: string): string {
 /** Current month key, e.g. "2026-09". */
 export function bulanIni(): string {
   return format(new Date(), "yyyy-MM");
+}
+
+/** Normalize a `yyyy-MM` URL param, returning null when invalid. */
+export function bulanValid(value: string | null | undefined): string | null {
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) return null;
+  const parsed = parseISO(`${value}-01`);
+  if (!isValid(parsed)) return null;
+  return format(parsed, "yyyy-MM") === value ? value : null;
 }
 
 /** Date (YYYY-MM-DD) for the first day of a month key. */

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Topbar } from "@/components/layout/topbar";
 import {
@@ -22,6 +23,7 @@ interface DashboardShellProps {
 
 export function DashboardShell({ profile, children }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <div className="flex min-h-screen w-full bg-muted/20">
@@ -60,7 +62,9 @@ export function DashboardShell({ profile, children }: DashboardShellProps) {
           }
         />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {children}
+          <div key={pathname} className="animate-page-content">
+            {children}
+          </div>
         </main>
       </div>
     </div>

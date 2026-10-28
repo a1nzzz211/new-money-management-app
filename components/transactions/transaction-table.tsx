@@ -49,12 +49,10 @@ export function TransactionTable({
   const searchParams = useSearchParams();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [editingTx, setEditingTx] = React.useState<TransactionWithCategory | null>(
-    null
-  );
-  const [deletingTx, setDeletingTx] = React.useState<TransactionWithCategory | null>(
-    null
-  );
+  const [editingTx, setEditingTx] =
+    React.useState<TransactionWithCategory | null>(null);
+  const [deletingTx, setDeletingTx] =
+    React.useState<TransactionWithCategory | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -105,7 +103,11 @@ export function TransactionTable({
             )}
           </div>
 
-          <Button onClick={openAdd} size="sm" className="gap-1.5 self-start sm:self-auto">
+          <Button
+            onClick={openAdd}
+            size="sm"
+            className="gap-1.5 self-start sm:self-auto"
+          >
             <PlusIcon className="size-4" />
             Catat Transaksi
           </Button>
@@ -122,7 +124,8 @@ export function TransactionTable({
                 Belum ada transaksi
               </p>
               <p className="text-xs text-muted-foreground max-w-sm">
-                Catat pengeluaran, pemasukan, atau tabungan pertama Anda untuk mulai mengelola keuangan.
+                Catat pengeluaran, pemasukan, atau tabungan pertama Anda untuk
+                mulai mengelola keuangan.
               </p>
             </div>
             <Button onClick={openAdd} size="sm" className="mt-2 gap-1.5">
@@ -136,10 +139,16 @@ export function TransactionTable({
               <TableHeader>
                 <TableRow className="bg-muted/40">
                   <TableHead className="w-[120px] text-xs">Tanggal</TableHead>
-                  <TableHead className="text-xs">Deskripsi & Kategori</TableHead>
+                  <TableHead className="text-xs">
+                    Deskripsi & Kategori
+                  </TableHead>
                   <TableHead className="w-[110px] text-xs">Jenis</TableHead>
-                  <TableHead className="w-[150px] text-right text-xs">Nominal</TableHead>
-                  <TableHead className="w-[100px] text-right text-xs">Aksi</TableHead>
+                  <TableHead className="w-[150px] text-right text-xs">
+                    Nominal
+                  </TableHead>
+                  <TableHead className="w-[100px] text-right text-xs">
+                    Aksi
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -158,13 +167,16 @@ export function TransactionTable({
                       <TableCell>
                         <div className="flex flex-col gap-1 max-w-[300px]">
                           <span className="font-medium text-foreground truncate text-sm">
-                            {tx.description?.trim() || tx.category?.name || "Tanpa Keterangan"}
+                            {tx.description?.trim() ||
+                              tx.category?.name ||
+                              "Tanpa Keterangan"}
                           </span>
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <span
                               className="size-2 rounded-full shrink-0"
                               style={{
-                                backgroundColor: tx.category?.color ?? "#94a3b8",
+                                backgroundColor:
+                                  tx.category?.color ?? "#94a3b8",
                               }}
                             />
                             <span className="truncate">
@@ -303,4 +315,3 @@ export function TransactionTable({
     </>
   );
 }
-

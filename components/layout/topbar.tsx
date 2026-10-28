@@ -1,12 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/actions";
 import { LogOutIcon } from "lucide-react";
@@ -30,11 +22,11 @@ export function Topbar({
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 lg:px-6 bg-card/60 backdrop-blur">
       <div className="flex items-center gap-2">{leftElement}</div>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button variant="ghost" size="icon-sm" className="rounded-full" />
-          }
+      <div className="flex items-center gap-2">
+        <div
+          className="flex cursor-default select-none items-center"
+          aria-label={`Profil ${name}`}
+          title={name}
         >
           <Avatar size="sm">
             {profile?.avatar_url ? (
@@ -42,22 +34,19 @@ export function Topbar({
             ) : null}
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="truncate">{name}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            closeOnClick={false}
-            onSelect={() => {
-              void signOut();
-            }}
+        </div>
+        <form action={signOut}>
+          <Button
+            type="submit"
+            variant="ghost"
+            size="icon-sm"
+            title="Keluar"
+            aria-label="Keluar"
           >
-            <LogOutIcon />
-            Keluar
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <LogOutIcon className="size-4" />
+          </Button>
+        </form>
+      </div>
     </header>
   );
 }

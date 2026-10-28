@@ -38,7 +38,7 @@
 - [x] Login page with Google OAuth trigger (`app/(auth)/login/page.tsx`, `lib/auth/actions.ts`).
 - [x] OAuth callback route handler (`app/auth/callback/route.ts`).
 - [x] Protected dashboard layout with user profile retrieval (`app/(dashboard)/layout.tsx`).
-- [x] Responsive app shell (`components/layout/dashboard-shell.tsx`) with desktop sidebar, mobile drawer sheet, and topbar (`components/layout/topbar.tsx`).
+- [x] Responsive app shell (`components/layout/dashboard-shell.tsx`) with desktop sidebar, mobile drawer sheet, and topbar (`components/layout/topbar.tsx`). The header profile is a static placeholder until the post-MVP backlog (3.12); logout stays accessible via the separate "Keluar" button.
 - [x] Central navigation definitions (`components/nav.ts`).
 
 ### 2.3 Dashboard Overview (`/dashboard`)
@@ -66,16 +66,16 @@
 - [x] Transaction page (`app/(dashboard)/transaksi/page.tsx`).
 
 ### 2.5 Shared Infrastructure Ready for Remaining Modules
-These helpers already exist and are consumed by the dashboard, but their dedicated routes/UI are not built yet:
+These helpers already existed and are consumed by the dashboard. Budget and goal helpers are now also used by the completed `/anggaran` (P1) and `/tabungan` (P2) pages; category CRUD remains dashboard-only until P5:
 
-- [x] `listBudgetsForMonth()` in `lib/data.ts` (note: actual name differs from the old `listBudgets` plan).
+- [x] `listBudgetsForMonth()` in `lib/data.ts` — consumed by `/anggaran` and the dashboard widget.
 - [x] `listGoalsWithProgress()` and `getGoalTotals()` in `lib/data.ts`.
 - [x] `budgetStatuses()`, `largestExpense()`, `requiredPerMonth()`, `byCategory()`, `totalsByMonth()` in `lib/analytics.ts`.
 - [x] Zod schemas for budgets, goals, contributions, and categories in `lib/validation.ts`.
 - [x] Database tables, RLS, `contribute_to_goal` RPC, and `monthly_summary` view in `supabase/migrations/0001_init.sql`.
 - [x] Dashboard widgets consume budget/goal helpers and link to `/anggaran` and `/tabungan`.
 
-> ⚠️ **Known dead links**: `components/nav.ts` and dashboard widgets link to `/anggaran`, `/tabungan`, `/analisis`, `/histori`, and `/kategori`, but those route files do not exist. They currently return 404. See P0.6 for handling.
+> ✅ **Dead links resolved (2026-10-28)**: `/anggaran` is now fully implemented (P1). `/tabungan`, `/analisis`, `/histori`, and `/kategori` render "Segera Hadir" placeholders (P0.6) until P2–P5 replace them.
 
 ### 2.6 Environment, Database & Tooling Progress (2026-10-27)
 - [x] Supabase project connected via `.env.local`; Auth health check returns HTTP 200.
@@ -90,16 +90,16 @@ These helpers already exist and are consumed by the dashboard, but their dedicat
 
 ## 3. Remaining Tasks & Action Plan (⏳)
 
-> **Last audited**: 2026-10-27. This section is the execution source of truth.
+> **Last audited**: 2026-10-28. This section is the execution source of truth.
 > Update checkboxes as work lands. Keep the order unless a task explicitly says it can be parallelized.
 
 ### 3.1 Status Snapshot
 
 | Module | Route | Status | Foundation present | Main blockers |
 |---|---|---|---|---|
-| Cross-cutting hardening | — | 🟡 In progress | Migration fixed; Supabase connected | P0.1–P0.4 and P0.6 still pending |
-| Anggaran | `/anggaran` | ⏳ Not built | Data + analytics + schema | Actions, UI, page, revalidation integration |
-| Tabungan | `/tabungan` | ⏳ Not built | Data + RPC + schema | Actions, contribution UI, page |
+| Cross-cutting hardening | — | 🟢 Complete | P0.1–P0.6 implemented; `0002_hardening.sql` pending apply to existing project | None for app code |
+| Anggaran | `/anggaran` | 🟢 Built | Actions, UI, page, month picker, revalidation | None |
+| Tabungan | `/tabungan` | 🟢 Built | Actions, contribution UI, status tabs, page | None |
 | Analisis | `/analisis` | ⏳ Not built | Analytics helpers + Recharts | Range queries, budget adherence helper, charts, page |
 | Histori & CSV | `/histori` | ⏳ Not built | Transaction query helpers | Export route, date range UI, table, page |
 | Kategori | `/kategori` | ⏳ Not built | Category queries + schema | CRUD actions, delete/reassign policy, UI, page |
@@ -136,13 +136,14 @@ flowchart TD
 
 **Goal**: Remove shared blockers and correctness gaps before building feature pages.
 
-- [ ] **P0.1 Shared month picker (`components/shared/month-picker.tsx`)**
+- [x] **P0.1 Shared month picker (`components/shared/month-picker.tsx`)**
   - Client component reading/writing the `month` URL search param (`yyyy-MM`).
   - Prev/next arrows, dropdown for the last 12 months, default `bulanIni()`.
   - Remove `month` param when selecting the current month (keeps URLs clean).
   - Reuse in `/anggaran`, `/analisis`, and `/histori`.
+  - **Completed 2026-10-28.** Ready for P1/P3/P4 pages.
 
-- [ ] **P0.2 Shared action helpers (`lib/actions/helpers.ts`)**
+- [x] **P0.2 Shared action helpers (`lib/actions/helpers.ts`)**
   - `requireUser()` → returns `{ supabase, user }` or a standard `ActionResult` error.
   - `revalidateFinance()` → revalidates the full matrix:
     - Transactions → `/transaksi`, `/dashboard`, `/anggaran`, `/analisis`, `/histori`.
@@ -150,16 +151,18 @@ flowchart TD
     - Goals/contributions → `/tabungan`, `/dashboard`, `/analisis`, `/transaksi`.
     - Categories → `/kategori`, `/transaksi`, `/anggaran`, `/analisis`, `/dashboard`.
   - Refactor `lib/actions/transactions.ts` to use it. **Current gap**: transaction mutations do not revalidate `/anggaran`.
+  - **Completed 2026-10-28.** `transactions.ts` now uses `requireUser()` + `revalidateFinance("transactions")`, which includes `/anggaran`.
 
-- [ ] **P0.3 Validation hardening (security & data integrity)**
+- [x] **P0.3 Validation hardening (security & data integrity)**
   - In `createTransaction` / `updateTransaction`, verify the category:
     - exists,
     - belongs to the authenticated user,
     - `category.kind === transaction.type`.
   - In budget actions, only allow categories with `kind = 'expense'`.
   - Return Indonesian errors for cross-user or mismatched-kind attempts.
+  - **Completed 2026-10-28.** Shared `verifyCategoryKind()` lives in `lib/actions/helpers.ts`. Budget actions do not exist yet; P1.1 must call `verifyCategoryKind(..., "expense")`.
 
-- [ ] **P0.4 Analytics semantics fixes (`lib/analytics.ts`)**
+- [x] **P0.4 Analytics semantics fixes (`lib/analytics.ts`)**
   - `budgetStatuses()`: change `over` to `spent > limit` (currently `>=` marks exactly-at-limit as over-budget).
   - Add a stable status field: `safe` (`usedPct < 0.8`), `warning` (`0.8 <= usedPct <= 1`), `over` (`usedPct > 1`).
   - Decide and document savings-rate semantics:
@@ -167,9 +170,11 @@ flowchart TD
     - Recommended: add `savingsRate = savings / income` and `netMargin = net / income`. Use `savingsRate` for the dashboard "Rasio tabungan" and analytics; keep `net` for "Saldo Bersih".
     - Apply the same change in both `totalsByMonth()` and `totalsFromSummary()`; extract shared finalization logic to prevent drift.
   - Update dashboard copy if the semantic decision changes the displayed number.
+  - **Completed 2026-10-28.** `MonthTotals` now carries `savingsRate` (savings/income) and `netMargin` (net/income); both aggregators share `finalizeTotals()`. `BudgetStatus.status` is used by the dashboard widget. Month-range calculation now reuses `rentangBulan()`/`bulanIni()` to avoid the UTC/local boundary drift from R10.
 
 - [x] **P0.5 Database migration hardening (BLOCKER) — `supabase/migrations/0001_init.sql`**
-  - **Completed 2026-10-27.** The script failed on a fresh PostgreSQL/Supabase project. The fixes below are now in the repo and applied to the linked project:
+  - **Completed 2026-10-27.** The script failed on a fresh PostgreSQL/Supabase project. The fixes below are now in the repo:
+  - **2026-10-28 update:** `0001_init.sql` remains the canonical fresh-install schema. Because the initial migration was already applied to the existing project, the fixes are also packaged as an idempotent `supabase/migrations/0002_hardening.sql`. **Apply `0002_hardening.sql` to the linked project before further DB work.** It is safe to re-run and includes a duplicate-name pre-check for the category unique index.
     1. `budgets.month` check uses `day(month)`, which is not a PostgreSQL function. Replace with:
        ```sql
        check (extract(day from month) = 1)
@@ -192,16 +197,17 @@ flowchart TD
   - If it has already been applied, add `supabase/migrations/0002_hardening.sql` instead and document the change.
   - Verify by running the script against a fresh Supabase project or local Supabase stack.
 
-- [ ] **P0.6 Dead-link handling (only if deploying before all modules exist)**
+- [x] **P0.6 Dead-link handling (only if deploying before all modules exist)**
   - Create lightweight "Segera Hadir" placeholder pages for unbuilt routes, or hide not-yet-built items from `NAV_ITEMS`.
   - Remove this task once P1–P5 are complete.
+  - **Completed 2026-10-28.** Added `components/shared/coming-soon.tsx` and placeholder pages for `/anggaran`, `/tabungan`, `/analisis`, `/histori`, and `/kategori` so navigation no longer 404s.
 
 **P0 acceptance criteria**
 - [x] `npm run lint` and `npm run build` pass.
 - [x] Migration applies cleanly to a fresh database.
-- [ ] Exactly-at-limit budgets are `warning`, not `over`.
-- [ ] A transaction cannot reference another user's category or a category of the wrong kind.
-- [ ] Adding/editing/deleting a transaction refreshes `/anggaran`.
+- [x] Exactly-at-limit budgets are `warning`, not `over`.
+- [x] A transaction cannot reference another user's category or a category of the wrong kind.
+- [x] Adding/editing/deleting a transaction refreshes `/anggaran`.
 
 ---
 
@@ -219,16 +225,18 @@ flowchart TD
 - Optional: `app/(dashboard)/anggaran/loading.tsx`
 
 **Action plan**
-- [ ] **1.1 Server actions (`lib/actions/budgets.ts`)**
+- [x] **1.1 Server actions (`lib/actions/budgets.ts`)**
   - `createBudget(values)`: parse with `budgetSchema`; normalize month to `${month}-01`; verify expense category ownership; translate unique-constraint violation (`23505`) into "Anggaran untuk kategori ini sudah ada di bulan tersebut".
   - `updateBudget(id, values)`: scope by `id` + `user_id`; keep category/month immutable in edit mode (only limit changes) to avoid duplicate conflicts.
   - `deleteBudget(id)`: scope by `id` + `user_id`.
   - Use `revalidateFinance()`; revalidate `/anggaran`, `/dashboard`, `/analisis`.
-- [ ] **1.2 Data helpers**
+  - **Completed 2026-10-28.**
+- [x] **1.2 Data helpers**
   - Reuse `listBudgetsForMonth(client, month)` (already implemented).
   - Fetch budgets and month transactions in parallel on the page.
   - Verify `budgetStatuses()` output after P0.4.
-- [ ] **1.3 UI components (`components/budgets/`)**
+  - **Completed 2026-10-28.** Page fetches budgets, month transactions, and expense categories in parallel.
+- [x] **1.3 UI components (`components/budgets/`)**
   - `budget-dialog.tsx`: add/edit limit. Add mode shows expense categories that do not already have a budget for the selected month; edit mode only edits the nominal.
   - `delete-budget-dialog.tsx`: confirmation with category and limit.
   - `budget-card.tsx`: category color dot, limit vs spent, remaining, progress bar, status badge.
@@ -237,21 +245,24 @@ flowchart TD
     - `> 100%` → red "Melebihi Batas" plus overage amount.
   - `budget-stats.tsx`: Total Anggaran, Total Terpakai, Sisa Anggaran, Kategori Melebihi Batas.
   - Use the shared `MonthPicker` from P0.1.
-- [ ] **1.4 Page (`app/(dashboard)/anggaran/page.tsx`)**
+  - **Completed 2026-10-28.** Added `budget-list.tsx` to own dialog state and the empty state.
+- [x] **1.4 Page (`app/(dashboard)/anggaran/page.tsx`)**
   - Read `month` from `searchParams` (Promise in Next.js 16); default `bulanIni()`; validate `yyyy-MM` and fall back to current month.
   - Parallel fetch budgets + month transactions.
   - Render header, stats, month picker, budget grid, and "Tambah Anggaran" button.
   - Empty state: "Belum ada anggaran bulan ini" + CTA.
-- [ ] **1.5 Integration**
+  - **Completed 2026-10-28.** Also added `loading.tsx` (skeleton cards) and `error.tsx` (retry state).
+- [x] **1.5 Integration**
   - Ensure P0.2 adds `/anggaran` to transaction revalidation.
   - Dashboard budget widget already renders these rows; confirm it reflects changes.
+  - **Completed 2026-10-28.** Transaction mutations already revalidate `/anggaran` via `revalidateFinance("transactions")`; budget mutations use `revalidateFinance("budgets")`.
 
 **Acceptance criteria**
-- [ ] One budget per category per month; duplicate attempts show a friendly message.
-- [ ] Create/edit/delete updates the list, stats, and dashboard widget.
-- [ ] Spent amount matches expense transactions in the selected month.
-- [ ] Progress colors and labels match the thresholds.
-- [ ] Month switching works via URL and survives refresh.
+- [x] One budget per category per month; duplicate attempts show a friendly message.
+- [x] Create/edit/delete updates the list, stats, and dashboard widget.
+- [x] Spent amount matches expense transactions in the selected month.
+- [x] Progress colors and labels match the thresholds.
+- [x] Month switching works via URL and survives refresh.
 
 **Edge cases**
 - Invalid `month` param → fallback, no crash.
@@ -275,40 +286,43 @@ flowchart TD
 - `app/(dashboard)/tabungan/page.tsx`
 
 **Action plan**
-- [ ] **2.1 Server actions (`lib/actions/goals.ts`)**
+- [x] **2.1 Server actions (`lib/actions/goals.ts`)**
   - `createGoal` / `updateGoal`: parse with `goalSchema`; normalize empty deadline to `null`.
   - `deleteGoal`: scope by `user_id`. Use a confirmation that explains contributions are removed and historical savings transactions remain in `/transaksi` (decide and document this behavior).
   - `contributeToGoal`: parse with `contributionSchema`; ensure the goal is owned by the user and `status = 'active'`; call `contribute_to_goal` RPC; surface RPC error messages in Indonesian; revalidate `/tabungan`, `/dashboard`, `/analisis`, `/transaksi`.
   - `updateGoalStatus(id, status)`: validate against `GOAL_STATUSES`; define allowed transitions (recommended: active ↔ archived; achieved → archived; archived → active; never move achieved back to active unless user explicitly reactivates).
-- [ ] **2.2 Data helpers**
+  - **Completed 2026-10-28.** Allowed transitions implemented as `active ↔ archived`, `achieved → archived`, `archived → active`; achieved goals cannot be reactivated.
+- [x] **2.2 Data helpers**
   - Reuse `listGoalsWithProgress(client)`.
   - Add optional `status` filter to the query, or filter in the page after fetching.
-- [ ] **2.3 UI components (`components/goals/`)**
+  - **Completed 2026-10-28.** Filtering happens in the page. Added `getGoalUnlinkedContributions()` so cards can flag contributions whose savings transaction was deleted.
+- [x] **2.3 UI components (`components/goals/`)**
   - `goal-dialog.tsx`: name, target amount, optional deadline; edit mode prefills.
   - `contribution-dialog.tsx`: amount, date, live Rupiah preview, current progress summary.
   - `delete-goal-dialog.tsx`: confirmation with saved amount and warning about ledger history.
   - `goal-card.tsx`: name, progress bar (cap display at 100%), saved vs target, remaining, deadline countdown, required-per-month estimate using `requiredPerMonth()`, and actions.
   - `goal-stats.tsx`: Total Target Terkumpul, Total Target Aktif, Rata-rata Capaian.
-- [ ] **2.4 Page (`app/(dashboard)/tabungan/page.tsx`)**
+  - **Completed 2026-10-28.** Added `goal-list.tsx` to own dialog state, empty states, and status transitions.
+- [x] **2.4 Page (`app/(dashboard)/tabungan/page.tsx`)**
   - Status tabs via search param `?status=active|achieved|archived`, default `active`.
   - Grid of goal cards + "Buat Target" button.
   - Empty states per tab.
+  - **Completed 2026-10-28.** Also added `loading.tsx` and `error.tsx`.
 
 **Acceptance criteria**
-- [ ] Contribution creates exactly one savings transaction and one contribution row via the RPC.
-- [ ] Goal auto-marks `achieved` when total contributions reach the target.
-- [ ] Progress and stats update on `/tabungan` and `/dashboard`.
-- [ ] Status tabs filter correctly and survive refresh.
-- [ ] Archived/achieved goals cannot receive contributions.
+- [x] Contribution creates exactly one savings transaction and one contribution row via the RPC.
+- [x] Goal auto-marks `achieved` when total contributions reach the target.
+- [x] Progress and stats update on `/tabungan` and `/dashboard`.
+- [x] Status tabs filter correctly and survive refresh.
+- [x] Archived/achieved goals cannot receive contributions.
 
 **Edge cases & decisions**
 - Deadline in the past: allow saving, but show "Batas waktu terlewat".
 - Deadline empty: hide per-month estimate.
 - Saved amount above target: show 100% progress and "Tercapai".
-- Deleting a savings transaction linked to a contribution: current FK is `on delete set null`, so goal progress remains. Decide whether to:
-  - delete the contribution when its linked transaction is deleted, or
-  - keep it and show a "tanpa transaksi" note. Document the chosen behavior in the UI and TASK.md.
-- Deleting a goal: contributions cascade, savings transactions remain.
+- Deleting a savings transaction linked to a contribution: **decided to keep the contribution and progress** (FK is `on delete set null`). The goal card shows "{n} setoran tanpa transaksi terkait" so the state is visible.
+- Deleting a goal: contributions cascade, savings transactions remain. The delete dialog explains that ledger transactions stay in `/transaksi`.
+- Status transitions: `active ↔ archived`, `achieved → archived`, `archived → active`. Achieved goals cannot be moved back to active.
 
 ---
 
@@ -445,9 +459,9 @@ flowchart TD
 
 **Goal**: Connect the app to a live Supabase backend and verify auth, schema, and RLS end-to-end.
 
-- [x] **6.1 Migration** — completed 2026-10-27 against the linked project.
-  - Complete P0.5 first.
-  - Apply `0001_init.sql` (and `0002_hardening.sql` if applicable) via Supabase SQL Editor or `supabase db push`.
+- [x] **6.1 Migration** — `0001_init.sql` applied 2026-10-27 to the linked project.
+  - `0002_hardening.sql` was added 2026-10-28 for the already-provisioned project; apply it via Supabase SQL Editor or `supabase db push` before further DB testing.
+  - Fresh projects can run `0001_init.sql` directly (it contains the hardened definitions), then run `0002_hardening.sql` idempotently.
   - Verify tables: `profiles`, `categories`, `transactions`, `budgets`, `savings_goals`, `goal_contributions`.
   - Verify the `monthly_summary` view uses `security_invoker = true`.
   - Verify trigger `on_auth_user_created` creates a profile and default categories.
@@ -508,17 +522,48 @@ flowchart TD
 
 | ID | Risk / gap | Impact | Mitigation / decision |
 |---|---|---|---|
-| R1 | `0001_init.sql` uses `day(month)`, expression inside a unique table constraint, and RLS on a view | Migration fails on a fresh project | Fix in P0.5 before any live testing |
-| R2 | Nav links to unbuilt routes | 404s in deployed app | P0.6 placeholders or hide nav items until built |
-| R3 | `savingsRate` is actually net margin | Misleading dashboard/analytics metric | Decide and implement in P0.4 |
-| R4 | `budgetStatuses` treats exactly 100% as over budget | Wrong "Melebihi Batas" label | Change to `spent > limit` in P0.4 |
-| R5 | Transactions can reference wrong-kind or another user's category | Broken budgets/analytics, cross-user data reference | Validate in P0.3 |
+| R1 | `0001_init.sql` uses `day(month)`, expression inside a unique table constraint, and RLS on a view | Migration fails on a fresh project | Fixed in P0.5; `0002_hardening.sql` covers already-provisioned projects (pending apply) |
+| R2 | Nav links to unbuilt routes | 404s in deployed app | Resolved in P0.6 with "Segera Hadir" placeholders |
+| R3 | `savingsRate` is actually net margin | Misleading dashboard/analytics metric | Fixed in P0.4: `savingsRate = savings/income`, `netMargin = net/income` |
+| R4 | `budgetStatuses` treats exactly 100% as over budget | Wrong "Melebihi Batas" label | Fixed in P0.4: `over = spent > limit`; 100% is `warning` |
+| R5 | Transactions can reference wrong-kind or another user's category | Broken budgets/analytics, cross-user data reference | Fixed in P0.3 via `verifyCategoryKind()` |
 | R6 | Category deletion semantics undefined | Orphan transactions, lost budgets | Reassign custom category transactions; block defaults (P5) |
 | R7 | Goal contribution vs. transaction deletion | Progress may not match ledger | Decide behavior in P2 and document |
 | R8 | Supabase default 1,000-row cap | Incomplete analytics/export | Paginate range and export queries (P3/P4) |
 | R9 | CSV formula injection | Spreadsheet security risk | Prefix dangerous cell starts in P4 |
-| R10 | Month boundary/timezone inconsistency (`awalBulan` local vs `monthKeyMonthsAgo` UTC) | Off-by-one around midnight/month boundaries | Standardize on Asia/Jakarta or UTC in P0.4; add boundary checks |
-| R11 | Re-running `create policy` fails | Migration re-run errors | Idempotent policy drops/guards in P0.5 |
+| R10 | Month boundary/timezone inconsistency (`awalBulan` local vs `monthKeyMonthsAgo` UTC) | Off-by-one around midnight/month boundaries | Fixed in P0.4: range start now uses local `rentangBulan()`/`bulanIni()` helpers |
+| R11 | Re-running `create policy` fails | Migration re-run errors | Fixed with idempotent policy drops in `0001` and `0002_hardening.sql` |
+| R12 | `/dashboard` and `/transaksi` feel slower to navigate than `/anggaran` and `/tabungan` | Perceived navigation lag | Implemented 2026-10-28 in 3.12.2: shared/route skeletons, top progress bar, content transition, and one redundant auth call removed. Prefetch audit + timing measurements remain. |
+
+---
+
+### 3.12 Post-MVP Backlog
+
+> Do not start these items until the main P1–P7 work is complete.
+
+#### 3.12.1 Profil Pengguna di Header
+
+> **Status 2026-10-28**: the header avatar is intentionally a non-interactive placeholder (`components/layout/topbar.tsx`) because there is no profile/account feature yet. Logout remains available through the adjacent "Keluar" button.
+
+- [ ] **Profile route or modal**: show and edit display name, email, avatar, and currency preference.
+- [ ] **Server action**: `updateProfile` with Zod validation, scoped by the authenticated user, with `revalidatePath("/", "layout")`.
+- [ ] **Avatar menu**: once the profile feature exists, make the avatar clickable and open a menu with Profil, Pengaturan, and Keluar (move logout into that menu).
+- [ ] **Accessibility & responsive check**: keyboard navigation, `aria-label`, mobile layout at 375 px.
+- [ ] **Documentation**: update README and TASK.md when the profile feature ships.
+
+#### 3.12.2 One-Page Loading Experience (requested 2026-10-28)
+
+**Observed cause**: `/anggaran` and `/tabungan` each have a route-level `loading.tsx`, so Next.js paints an instant skeleton while the server runs auth + queries. `/dashboard` and `/transaksi` have no `loading.tsx`, so the browser keeps the old screen until the full RSC response is ready. `/dashboard` is also heavier (6 parallel data queries plus aggregation), which makes the missing skeleton more noticeable.
+
+**Implemented 2026-10-28**: shared route skeleton, dashboard/transaksi skeletons, top progress bar, content fade-in with reduced-motion handling, and duplicate layout auth call removed.
+
+- [x] **Shared dashboard skeleton**: `app/(dashboard)/loading.tsx` keeps the shell visible and animates only the content area.
+- [x] **Route-specific skeletons**: `app/(dashboard)/dashboard/loading.tsx` and `app/(dashboard)/transaksi/loading.tsx`; `/analisis`, `/histori`, and `/kategori` will reuse the shared skeleton until they get dedicated ones.
+- [x] **Top navigation progress**: `components/layout/link-progress.tsx` uses `useLinkStatus()` inside each sidebar link to show a fixed top bar while navigation is pending.
+- [x] **Content transition**: `DashboardShell` keys the content wrapper by pathname and applies `animate-page-content`; `prefers-reduced-motion` disables it.
+- [ ] **Prefetch strategy**: keep sidebar `<Link>` prefetch enabled where safe and verify it does not trigger expensive `/dashboard` queries unnecessarily.
+- [x] **Auth latency (partial)**: dashboard layout now passes `user.id` into `getProfile()` instead of calling `auth.getUser()` twice. `proxy.ts` still performs one auth call per navigation.
+- [ ] **Measure before/after**: record production navigation timings for `/dashboard`, `/transaksi`, `/anggaran`, and `/tabungan` after the changes.
 
 ---
 
@@ -560,7 +605,7 @@ npm run build
 ```
 Both commands must exit with code `0`.
 
-**Last verified**: 2026-10-27 — both commands passed after the migration hardening and Roboto font change.
+**Last verified**: 2026-10-28 — `npm run lint` and `npm run build` both exited `0` after the P0 hardening, P1 Anggaran, P2 Tabungan, one-page loading experience, and chart tooltip fix.
 
 Additional checks for database work:
 - Apply the migration to a fresh Supabase project and confirm no SQL errors.

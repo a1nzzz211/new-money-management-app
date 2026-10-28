@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/components/nav";
+import { LinkProgress } from "@/components/layout/link-progress";
 import { WalletMinimalIcon } from "lucide-react";
 
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
@@ -38,6 +39,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           >
             <Icon className="size-4" />
             {item.label}
+            <LinkProgress />
           </Link>
         );
       })}
