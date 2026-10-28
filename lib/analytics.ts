@@ -1,5 +1,26 @@
+import { differenceInCalendarDays, endOfMonth, parseISO } from "date-fns";
 import type { MonthlySummaryRow, TransactionWithCategory } from "@/lib/data";
 import type { BudgetWithCategory } from "@/lib/data";
+import {
+  awalBulan,
+  hariDalamBulan,
+  hariIni,
+  rentangBulan,
+} from "@/lib/format";
+
+export const ANALYTICS_RANGES = [1, 3, 6, 12] as const;
+export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
+export const DEFAULT_ANALYTICS_RANGE: AnalyticsRange = 6;
+
+/** Normalize an `range` URL param, falling back to the default range. */
+export function parseAnalyticsRange(
+  value: string | null | undefined,
+): AnalyticsRange {
+  const numeric = Number(value);
+  return (ANALYTICS_RANGES as readonly number[]).includes(numeric)
+    ? (numeric as AnalyticsRange)
+    : DEFAULT_ANALYTICS_RANGE;
+}
 
 export interface MonthTotals {
   month: string; // yyyy-MM
@@ -11,7 +32,7 @@ export interface MonthTotals {
   netMargin: number; // net / income (0 when income === 0)
 }
 
-function createMonthTotals(month: string): MonthTotals {
+export function emptyMonthTotals(month: string): MonthTotals {
   return {
     month,
     income: 0,
@@ -42,7 +63,22 @@ export function totalsByMonth(
   const acc: Record<string, MonthTotals> = {};
   for (const t of txs) {
     const key = t.occurred_on.slice(0, 7);
-    const m = (acc[key] ??= createMonthTotals(key));
+    const m = (acc[key] ??= emptyMonthTotals(key));
+    if (t.type === "income") m.income += Number(t.amount);
+    else if (t.type === "expense") m.expense += Number(t.amount);
+    else m.savings += Number(t.amount);
+  }
+  return finalizeTotals(acc);
+}
+
+/** Aggregate raw transactions into per-day totals keyed by yyyy-MM-dd. */
+export function totalsByDay(
+  txs: TransactionWithCategory[],
+): Record<string, MonthTotals> {
+  const acc: Record<string, MonthTotals> = {};
+  for (const t of txs) {
+    const key = t.occurred_on.slice(0, 10);
+    const m = (acc[key] ??= emptyMonthTotals(key));
     if (t.type === "income") m.income += Number(t.amount);
     else if (t.type === "expense") m.expense += Number(t.amount);
     else m.savings += Number(t.amount);
@@ -57,7 +93,7 @@ export function totalsFromSummary(
   const acc: Record<string, MonthTotals> = {};
   for (const r of rows) {
     const key = r.month.slice(0, 7);
-    const m = (acc[key] ??= createMonthTotals(key));
+    const m = (acc[key] ??= emptyMonthTotals(key));
     if (r.type === "income") m.income += Number(r.total);
     else if (r.type === "expense") m.expense += Number(r.total);
     else m.savings += Number(r.total);
@@ -104,9 +140,16 @@ export function momChange(current: number, previous: number): number | null {
   return (current - previous) / previous;
 }
 
-/** Average daily spend for a month, given number of days elapsed/total. */
-export function avgDaily(expense: number, days: number): number {
+/** Average daily spend across a period, given its total number of days. */
+export function dailyAverage(expense: number, days: number): number {
   return days > 0 ? expense / days : 0;
+}
+
+/** Number of calendar days in an inclusive `yyyy-MM` month range. */
+export function daysInRange(fromMonth: string, toMonth: string): number {
+  const start = parseISO(`${fromMonth}-01`);
+  const end = endOfMonth(parseISO(`${toMonth}-01`));
+  return differenceInCalendarDays(end, start) + 1;
 }
 
 export type BudgetHealth = "safe" | "warning" | "over";
@@ -153,6 +196,54 @@ export function budgetStatuses(
   });
 }
 
+export interface BudgetAdherence {
+  budgetCount: number;
+  totalLimit: number;
+  totalSpent: number;
+  remaining: number;
+  usedPct: number; // 0..n (can exceed 1)
+  overCount: number;
+}
+
+/**
+ * Aggregate budget adherence across an inclusive month range.
+ * Only expense transactions are counted, matched per budget month + category.
+ */
+export function budgetAdherence(
+  budgets: BudgetWithCategory[],
+  txs: TransactionWithCategory[],
+): BudgetAdherence {
+  const spentByMonthCategory: Record<string, number> = {};
+  for (const t of txs) {
+    if (t.type !== "expense" || !t.category_id) continue;
+    const key = `${t.occurred_on.slice(0, 7)}|${t.category_id}`;
+    spentByMonthCategory[key] =
+      (spentByMonthCategory[key] ?? 0) + Number(t.amount);
+  }
+
+  let totalLimit = 0;
+  let totalSpent = 0;
+  let overCount = 0;
+
+  for (const b of budgets) {
+    const limit = Number(b.limit_amount);
+    const monthKey = b.month.slice(0, 7);
+    const spent = spentByMonthCategory[`${monthKey}|${b.category_id}`] ?? 0;
+    totalLimit += limit;
+    totalSpent += spent;
+    if (spent > limit) overCount += 1;
+  }
+
+  return {
+    budgetCount: budgets.length,
+    totalLimit,
+    totalSpent,
+    remaining: totalLimit - totalSpent,
+    usedPct: totalLimit > 0 ? totalSpent / totalLimit : 0,
+    overCount,
+  };
+}
+
 export interface LargestTx {
   id: string;
   amount: number;
@@ -179,6 +270,86 @@ export function largestExpense(
     categoryName: best.category?.name ?? "-",
     color: best.category?.color ?? "#6b7280",
     occurredOn: best.occurred_on,
+  };
+}
+
+export interface AnalyticsTotals {
+  income: number;
+  expense: number;
+  savings: number;
+  net: number;
+}
+
+export type TrendGranularity = "day" | "month";
+
+export interface AnalyticsSnapshot {
+  range: AnalyticsRange;
+  granularity: TrendGranularity;
+  series: MonthTotals[];
+  totals: AnalyticsTotals;
+  savingsRate: number;
+  days: number;
+  dailyAverage: number;
+  largest: LargestTx | null;
+  adherence: BudgetAdherence;
+  categories: CategorySlice[];
+  hasTransactions: boolean;
+}
+
+/**
+ * Build every view model the analytics page needs for one range from a single
+ * dataset. Computing this on the server keeps the client payload compact and
+ * lets the range selector switch instantly without another round trip.
+ */
+export function buildAnalyticsSnapshot(
+  allTransactions: TransactionWithCategory[],
+  allBudgets: BudgetWithCategory[],
+  currentMonth: string,
+  range: AnalyticsRange,
+): AnalyticsSnapshot {
+  const months = rentangBulan(currentMonth, range);
+  const fromMonth = months[0];
+  const fromISO = awalBulan(fromMonth);
+
+  const transactions = allTransactions.filter((t) => t.occurred_on >= fromISO);
+  const budgets = allBudgets.filter((b) => b.month.slice(0, 7) >= fromMonth);
+
+  // A single month is spread by day so the chart is not one lonely bar.
+  const granularity: TrendGranularity = range === 1 ? "day" : "month";
+  const keys =
+    granularity === "day"
+      ? hariDalamBulan(currentMonth).filter((day) => day <= hariIni())
+      : months;
+  const totalsMap =
+    granularity === "day"
+      ? totalsByDay(transactions)
+      : totalsByMonth(transactions);
+  const series = keys.map((key) => totalsMap[key] ?? emptyMonthTotals(key));
+
+  const totals = series.reduce<AnalyticsTotals>(
+    (acc, month) => ({
+      income: acc.income + month.income,
+      expense: acc.expense + month.expense,
+      savings: acc.savings + month.savings,
+      net: acc.net + month.net,
+    }),
+    { income: 0, expense: 0, savings: 0, net: 0 },
+  );
+
+  const days = daysInRange(fromMonth, currentMonth);
+
+  return {
+    range,
+    granularity,
+    series,
+    totals,
+    savingsRate: totals.income > 0 ? totals.savings / totals.income : 0,
+    days,
+    dailyAverage: dailyAverage(totals.expense, days),
+    largest: largestExpense(transactions),
+    adherence: budgetAdherence(budgets, transactions),
+    categories: byCategory(transactions),
+    hasTransactions: transactions.length > 0,
   };
 }
 

@@ -1,4 +1,5 @@
 import {
+  eachDayOfInterval,
   endOfMonth,
   format,
   isValid,
@@ -69,6 +70,15 @@ export function awalBulan(monthKey: string): string {
 /** Last day of month as YYYY-MM-DD. */
 export function akhirBulan(monthKey: string): string {
   return format(endOfMonth(parseISO(`${monthKey}-01`)), "yyyy-MM-dd");
+}
+
+/** Every day in a month as YYYY-MM-DD, oldest first. */
+export function hariDalamBulan(monthKey: string): string[] {
+  const start = startOfMonth(parseISO(`${monthKey}-01`));
+  const end = endOfMonth(start);
+  return eachDayOfInterval({ start, end }).map((day) =>
+    format(day, "yyyy-MM-dd"),
+  );
 }
 
 /** List of N month keys ending with `monthKey`, oldest first. e.g. ["2026-04", ..., "2026-09"] */

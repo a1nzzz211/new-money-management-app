@@ -75,7 +75,7 @@ These helpers already existed and are consumed by the dashboard. Budget and goal
 - [x] Database tables, RLS, `contribute_to_goal` RPC, and `monthly_summary` view in `supabase/migrations/0001_init.sql`.
 - [x] Dashboard widgets consume budget/goal helpers and link to `/anggaran` and `/tabungan`.
 
-> ✅ **Dead links resolved (2026-10-28)**: `/anggaran` is now fully implemented (P1). `/tabungan`, `/analisis`, `/histori`, and `/kategori` render "Segera Hadir" placeholders (P0.6) until P2–P5 replace them.
+> ✅ **Dead links resolved (2026-10-28)**: `/anggaran` (P1), `/tabungan` (P2), and `/analisis` (P3) are now fully implemented. `/histori` and `/kategori` still render "Segera Hadir" placeholders (P0.6) until P4–P5 replace them.
 
 ### 2.6 Environment, Database & Tooling Progress (2026-10-27)
 - [x] Supabase project connected via `.env.local`; Auth health check returns HTTP 200.
@@ -100,7 +100,7 @@ These helpers already existed and are consumed by the dashboard. Budget and goal
 | Cross-cutting hardening | — | 🟢 Complete | P0.1–P0.6 implemented; `0002_hardening.sql` pending apply to existing project | None for app code |
 | Anggaran | `/anggaran` | 🟢 Built | Actions, UI, page, month picker, revalidation | None |
 | Tabungan | `/tabungan` | 🟢 Built | Actions, contribution UI, status tabs, page | None |
-| Analisis | `/analisis` | ⏳ Not built | Analytics helpers + Recharts | Range queries, budget adherence helper, charts, page |
+| Analisis | `/analisis` | 🟢 Built | Range-aware queries, adherence helper, Recharts, page | None |
 | Histori & CSV | `/histori` | ⏳ Not built | Transaction query helpers | Export route, date range UI, table, page |
 | Kategori | `/kategori` | ⏳ Not built | Category queries + schema | CRUD actions, delete/reassign policy, UI, page |
 | Supabase production | — | 🟡 Local configured | Migration applied; Google OAuth working | RLS two-user test and production deployment pending |
@@ -339,33 +339,39 @@ flowchart TD
 - Additions to `lib/data.ts` and `lib/analytics.ts`
 
 **Action plan**
-- [ ] **3.1 Range-aware data layer**
+- [x] **3.1 Range-aware data layer**
   - Read `range` from `searchParams`: `1`, `3`, `6`, or `12` months (default `6`).
   - Fetch transactions since the start of the range with `listTransactionsSince()`.
   - Fetch budgets across the range; add `listBudgetsBetween(client, fromMonth, toMonth)` or query per month.
   - Use `totalsByMonth()` for monthly series and `byCategory()` for the pie chart.
   - Guard against the Supabase default 1,000-row response cap for large ranges; paginate if needed.
-- [ ] **3.2 Analytics helpers**
+  - **Completed 2026-10-28.** `listTransactionsSince()` now paginates in 1,000-row chunks and accepts an optional upper bound; `listBudgetsBetween()` was added.
+  - **Performance fix 2026-10-28.** The page fetches the widest range (12 months) once, builds all four range snapshots on the server (`buildAnalyticsSnapshot()`), and the client only switches between pre-aggregated snapshots. Range changes update the URL via `history.replaceState` and never trigger another RSC round trip; charts have animation disabled so switching is instant.
+  - **1-month granularity 2026-10-28.** The 1-month snapshot aggregates the trend chart per day (up to today) via `totalsByDay()` / `hariDalamBulan()` instead of rendering a single monthly bar. Labels thin out automatically with `minTickGap` and bars/dots shrink for readability.
+- [x] **3.2 Analytics helpers**
   - `budgetAdherence(budgets, txs)`: total limit vs total spent, percentage, over-budget category count.
   - `dailyAverage()`: use the number of days in the selected period, not just elapsed days.
   - Apply the P0.4 savings-rate definition consistently.
   - Add `largestExpense()` usage for "Pengeluaran Terbesar".
-- [ ] **3.3 UI components (`components/analytics/`)**
+  - **Completed 2026-10-28.** Added `budgetAdherence()`, `dailyAverage()`, `daysInRange()`, `emptyMonthTotals()`, and `parseAnalyticsRange()`.
+- [x] **3.3 UI components (`components/analytics/`)**
   - `monthly-trend-chart.tsx`: Recharts `ComposedChart` with income/expense bars and savings/net line; reuse tooltip and `rupiahShort` conventions.
   - `category-pie-chart.tsx`: donut chart with category colors, legend, percentage tooltips, and empty state.
   - `spending-behavior-card.tsx`: Pengeluaran Terbesar, Rata-rata Pengeluaran Harian, Rasio Tabungan, Ketaatan Anggaran.
   - `timeframe-selector.tsx`: 1/3/6/12-month pills that update the `range` URL param (no dead state).
-- [ ] **3.4 Page (`app/(dashboard)/analisis/page.tsx`)**
+  - **Completed 2026-10-28.** Added `analytics-stats.tsx` for the four KPI cards.
+- [x] **3.4 Page (`app/(dashboard)/analisis/page.tsx`)**
   - Assemble the timeframe selector, KPI cards, trend chart, pie chart, and behavior card.
   - Responsive grid: charts stack on mobile.
   - Empty state when the selected range has no transactions.
+  - **Completed 2026-10-28.** Also added `loading.tsx` and `error.tsx`.
 
 **Acceptance criteria**
-- [ ] Range selector changes all charts and KPIs consistently.
-- [ ] Category percentages sum to ~100% (with rounding tolerance).
-- [ ] Largest expense, daily average, savings rate, and budget adherence are correct for the selected range.
-- [ ] Budget adherence only includes expense budgets and matching expense transactions.
-- [ ] Charts render without hydration or Recharts container warnings.
+- [x] Range selector changes all charts and KPIs consistently.
+- [x] Category percentages sum to ~100% (with rounding tolerance).
+- [x] Largest expense, daily average, savings rate, and budget adherence are correct for the selected range.
+- [x] Budget adherence only includes expense budgets and matching expense transactions.
+- [x] Charts render without hydration or Recharts container warnings.
 
 ---
 
@@ -558,12 +564,36 @@ flowchart TD
 **Implemented 2026-10-28**: shared route skeleton, dashboard/transaksi skeletons, top progress bar, content fade-in with reduced-motion handling, and duplicate layout auth call removed.
 
 - [x] **Shared dashboard skeleton**: `app/(dashboard)/loading.tsx` keeps the shell visible and animates only the content area.
-- [x] **Route-specific skeletons**: `app/(dashboard)/dashboard/loading.tsx` and `app/(dashboard)/transaksi/loading.tsx`; `/analisis`, `/histori`, and `/kategori` will reuse the shared skeleton until they get dedicated ones.
+- [x] **Route-specific skeletons**: `app/(dashboard)/dashboard/loading.tsx`, `transaksi/loading.tsx`, `anggaran/loading.tsx`, `tabungan/loading.tsx`, and `analisis/loading.tsx`; `/histori` and `/kategori` still reuse the shared skeleton until they get dedicated ones.
 - [x] **Top navigation progress**: `components/layout/link-progress.tsx` uses `useLinkStatus()` inside each sidebar link to show a fixed top bar while navigation is pending.
 - [x] **Content transition**: `DashboardShell` keys the content wrapper by pathname and applies `animate-page-content`; `prefers-reduced-motion` disables it.
 - [ ] **Prefetch strategy**: keep sidebar `<Link>` prefetch enabled where safe and verify it does not trigger expensive `/dashboard` queries unnecessarily.
 - [x] **Auth latency (partial)**: dashboard layout now passes `user.id` into `getProfile()` instead of calling `auth.getUser()` twice. `proxy.ts` still performs one auth call per navigation.
 - [ ] **Measure before/after**: record production navigation timings for `/dashboard`, `/transaksi`, `/anggaran`, and `/tabungan` after the changes.
+
+#### 3.12.3 Session Security Policy — 7-Day Timebox (requested 2026-10-28)
+
+**Goal**: require users to sign in again after 7 days, while keeping access tokens short-lived.
+
+- [ ] Set Supabase Dashboard → **Authentication → Sessions → Time-box user sessions** to `168h` (7 days) on both development and production projects.
+- [ ] Keep JWT expiry at the default 1 hour; the refresh flow should continue renewing access tokens during the session.
+- [ ] Decide whether to also set an inactivity timeout (for example 24–48 hours); if yes, document the chosen value.
+- [ ] Verify a fresh login, normal token refresh through `proxy.ts`, and rejection after the 7-day timebox.
+- [ ] Document the setting in README; note that this is a Supabase project-level setting, not application code.
+
+#### 3.12.4 PWA / Mobile App Shell (requested 2026-10-28)
+
+**Goal**: make the web app installable on Android/iOS home screens with an app-like shell. The existing UI is already responsive (`components/layout/dashboard-shell.tsx` uses a mobile drawer), so this is mostly metadata + caching work.
+
+- [ ] **Web app manifest**: add `app/manifest.ts` (Next.js 16 built-in) with `name`, `short_name`, `start_url: "/"`, `display: "standalone"`, `background_color`, `theme_color`, and Bahasa Indonesia description.
+- [ ] **Icons**: generate 192×192 and 512×512 PNGs (plus `apple-touch-icon` and maskable variant) into `public/`, referenced from the manifest and `metadata`.
+- [ ] **Viewport & theme color**: export `viewport` from `app/layout.tsx` (`themeColor`, `viewportFit: "cover"`) so the standalone window matches the app colors.
+- [ ] **Service worker**: minimal hand-written `public/sw.js` (or a small library) registered from a client component; precache the app shell and static assets only.
+- [ ] **Offline strategy**: do NOT cache Supabase API/auth responses. Cache-first for static assets, network-only for data; show an offline fallback page instead of stale financial data.
+- [ ] **Install prompt**: optional custom "Pasang aplikasi" button using `beforeinstallprompt` (Android/desktop) with hidden fallback on iOS.
+- [ ] **Safe areas**: check `env(safe-area-inset-*)` padding on topbar and dialogs at 375 px in standalone mode.
+- [ ] **Verify**: Lighthouse PWA audit passes, install works on Android + iOS Safari, deep links to `/dashboard` keep the session, `npm run lint` and `npm run build` exit `0`.
+- [ ] **Out of scope**: push notifications and background sync until there is a concrete use case.
 
 ---
 
@@ -605,7 +635,7 @@ npm run build
 ```
 Both commands must exit with code `0`.
 
-**Last verified**: 2026-10-28 — `npm run lint` and `npm run build` both exited `0` after the P0 hardening, P1 Anggaran, P2 Tabungan, one-page loading experience, and chart tooltip fix.
+**Last verified**: 2026-10-28 — `npm run lint` and `npm run build` both exited `0` after the P0 hardening, P1 Anggaran, P2 Tabungan, P3 Analisis, one-page loading experience, and chart tooltip fix.
 
 Additional checks for database work:
 - Apply the migration to a fresh Supabase project and confirm no SQL errors.

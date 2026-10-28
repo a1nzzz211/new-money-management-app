@@ -155,17 +155,38 @@ export async function listMonthTransactions(
   return (data as unknown as TransactionWithCategory[]) ?? [];
 }
 
-/** All transactions since a date (for analytics trends). */
+/**
+ * All transactions since a date (for analytics trends).
+ * Paginates in 1,000-row chunks so the Supabase default cap never truncates.
+ */
 export async function listTransactionsSince(
   client: Client,
   sinceISO: string,
+  untilISO?: string,
 ): Promise<TransactionWithCategory[]> {
-  const { data } = await client
-    .from("transactions")
-    .select(TX_SELECT)
-    .gte("occurred_on", sinceISO)
-    .order("occurred_on", { ascending: true });
-  return (data as unknown as TransactionWithCategory[]) ?? [];
+  const CHUNK = 1000;
+  const rows: TransactionWithCategory[] = [];
+
+  for (let from = 0; ; from += CHUNK) {
+    let query = client
+      .from("transactions")
+      .select(TX_SELECT)
+      .gte("occurred_on", sinceISO)
+      .order("occurred_on", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (untilISO) query = query.lte("occurred_on", untilISO);
+
+    const { data, error } = await query.range(from, from + CHUNK - 1);
+    if (error) break;
+
+    const page = (data as unknown as TransactionWithCategory[]) ?? [];
+    rows.push(...page);
+    if (page.length < CHUNK) break;
+  }
+
+  return rows;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +236,22 @@ export async function listBudgetsForMonth(
     .from("budgets")
     .select("*, category:categories(id, name, color, kind)")
     .eq("month", `${month}-01`)
+    .order("created_at", { ascending: true });
+  return (data as unknown as BudgetWithCategory[]) ?? [];
+}
+
+/** All budgets in an inclusive month range (`yyyy-MM`). */
+export async function listBudgetsBetween(
+  client: Client,
+  fromMonth: string,
+  toMonth: string,
+): Promise<BudgetWithCategory[]> {
+  const { data } = await client
+    .from("budgets")
+    .select("*, category:categories(id, name, color, kind)")
+    .gte("month", `${fromMonth}-01`)
+    .lte("month", `${toMonth}-01`)
+    .order("month", { ascending: true })
     .order("created_at", { ascending: true });
   return (data as unknown as BudgetWithCategory[]) ?? [];
 }
