@@ -62,6 +62,14 @@ export function bulanValid(value: string | null | undefined): string | null {
   return format(parsed, "yyyy-MM") === value ? value : null;
 }
 
+/** Normalize a `YYYY-MM-DD` URL param, returning null when invalid. */
+export function tanggalValid(value: string | null | undefined): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = parseISO(value);
+  if (!isValid(parsed)) return null;
+  return format(parsed, "yyyy-MM-dd") === value ? value : null;
+}
+
 /** Date (YYYY-MM-DD) for the first day of a month key. */
 export function awalBulan(monthKey: string): string {
   return format(startOfMonth(parseISO(`${monthKey}-01`)), "yyyy-MM-dd");

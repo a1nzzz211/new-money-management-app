@@ -7,6 +7,8 @@ A modern personal finance and expense tracking web application built with **Next
 - 🔐 **Supabase Authentication**: Seamless Google OAuth login and server-side session management.
 - 🎯 **Budget Management**: Set monthly spending limits per expense category, track usage with progress bars, and get clear "Aman", "Mendekati Batas", or "Melebihi Batas" statuses.
 - 🐷 **Savings Goals**: Create financial targets with optional deadlines, record contributions that also appear as savings transactions, and track progress with status tabs and monthly estimates.
+- 🧾 **Transaction History & Export**: Browse the full ledger with inclusive date-range filters, sort by date or amount, and export the filtered data to CSV or a styled XLSX workbook with summary sheets and native charts.
+- 🏷️ **Category Management**: Grouped expense, income, and savings categories with custom colors, transaction usage counts, protected defaults, and safe deletion that reassigns transactions to a fallback category.
 - 📊 **Financial Dashboard**:
   - Net balance, income, expense, and savings metrics.
   - Month-over-month (MoM) spending comparison.

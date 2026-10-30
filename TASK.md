@@ -75,7 +75,7 @@ These helpers already existed and are consumed by the dashboard. Budget and goal
 - [x] Database tables, RLS, `contribute_to_goal` RPC, and `monthly_summary` view in `supabase/migrations/0001_init.sql`.
 - [x] Dashboard widgets consume budget/goal helpers and link to `/anggaran` and `/tabungan`.
 
-> ✅ **Dead links resolved (2026-10-28)**: `/anggaran` (P1), `/tabungan` (P2), and `/analisis` (P3) are now fully implemented. `/histori` and `/kategori` still render "Segera Hadir" placeholders (P0.6) until P4–P5 replace them.
+> ✅ **Dead links resolved**: `/anggaran` (P1), `/tabungan` (P2), `/analisis` (P3), `/histori` (P4), and `/kategori` (P5) are now fully implemented.
 
 ### 2.6 Environment, Database & Tooling Progress (2026-10-27)
 - [x] Supabase project connected via `.env.local`; Auth health check returns HTTP 200.
@@ -90,7 +90,7 @@ These helpers already existed and are consumed by the dashboard. Budget and goal
 
 ## 3. Remaining Tasks & Action Plan (⏳)
 
-> **Last audited**: 2026-10-28. This section is the execution source of truth.
+> **Last audited**: 2026-10-30. This section is the execution source of truth.
 > Update checkboxes as work lands. Keep the order unless a task explicitly says it can be parallelized.
 
 ### 3.1 Status Snapshot
@@ -101,8 +101,8 @@ These helpers already existed and are consumed by the dashboard. Budget and goal
 | Anggaran | `/anggaran` | 🟢 Built | Actions, UI, page, month picker, revalidation | None |
 | Tabungan | `/tabungan` | 🟢 Built | Actions, contribution UI, status tabs, page | None |
 | Analisis | `/analisis` | 🟢 Built | Range-aware queries, adherence helper, Recharts, page | None |
-| Histori & CSV | `/histori` | ⏳ Not built | Transaction query helpers | Export route, date range UI, table, page |
-| Kategori | `/kategori` | ⏳ Not built | Category queries + schema | CRUD actions, delete/reassign policy, UI, page |
+| Histori, CSV & XLSX | `/histori` | 🟢 Built | Sortable range queries, CSV/XLSX helpers, export routes | None |
+| Kategori | `/kategori` | 🟢 Built | Actions, grouped UI, usage counts, fallback reassignment | None |
 | Supabase production | — | 🟡 Local configured | Migration applied; Google OAuth working | RLS two-user test and production deployment pending |
 
 ### 3.2 Execution Order, Dependencies & Definition of Done
@@ -375,9 +375,9 @@ flowchart TD
 
 ---
 
-### 3.7 Priority 4 — Fitur Histori & Ekspor CSV (`/histori`)
+### 3.7 Priority 4 — Fitur Histori & Ekspor CSV/XLSX (`/histori`)
 
-**Goal**: Provide a full transaction ledger with date-range filters and a reliable CSV export.
+**Goal**: Provide a full transaction ledger with date-range filters and reliable CSV/XLSX exports.
 
 **Files**
 - `app/api/export/route.ts` (new)
@@ -388,31 +388,41 @@ flowchart TD
 - `app/(dashboard)/histori/page.tsx`
 
 **Action plan**
-- [ ] **4.1 CSV export (`app/api/export/route.ts`)**
-  - `GET` handler with `from` and `to` query params; authenticate with the server Supabase client.
-  - Scope by the authenticated user; reject unauthenticated requests.
-  - Fetch **all** matching rows, paginating in chunks of 1,000 (Supabase default limit).
-  - Columns: `Tanggal, Jenis, Kategori, Nominal, Catatan`.
-  - Escape quotes/commas/newlines; prepend UTF-8 BOM (`\uFEFF`) so Excel renders Indonesian characters correctly.
-  - Prevent CSV formula injection: prefix cells beginning with `=`, `+`, `-`, or `@` with an apostrophe.
-  - Set `Content-Type: text/csv; charset=utf-8` and `Content-Disposition: attachment; filename="transaksi-YYYY-MM-DD.csv"`.
-  - Return a 400 with an Indonesian message when `from > to`.
-- [ ] **4.2 UI components (`components/history/`)**
-  - `date-range-filter.tsx`: From/To date inputs synced to URL params; validation and "Reset" action.
-  - `export-csv-button.tsx`: triggers the route handler with the active filters; disabled when there are no rows.
-  - `history-table.tsx`: full ledger with sortable Date and Amount columns (URL `sort`/`dir` or client-side sort), pagination, and empty state.
-- [ ] **4.3 Page (`app/(dashboard)/histori/page.tsx`)**
-  - Read `from`, `to`, `page`, `sort`, `dir` from `searchParams`.
-  - Parallel fetch rows/count and category options if needed.
-  - Render header, date filter, export button, summary count, and table.
-  - Decide the overlap with `/transaksi`: `/transaksi` stays the quick month-based ledger; `/histori` focuses on arbitrary date ranges + export. Reuse table primitives where practical.
+- [x] **4.1 CSV export (`app/api/export/route.ts`)**
+   - `GET` handler with `from` and `to` query params; authenticate with the server Supabase client.
+   - Scope by the authenticated user; reject unauthenticated requests.
+   - Fetch **all** matching rows, paginating in chunks of 1,000 (Supabase default limit).
+   - Columns: `Tanggal, Jenis, Kategori, Nominal, Catatan`.
+   - Escape quotes/commas/newlines; prepend UTF-8 BOM (`\uFEFF`) so Excel renders Indonesian characters correctly.
+   - Prevent CSV formula injection: prefix cells beginning with `=`, `+`, `-`, or `@` with an apostrophe.
+   - Set `Content-Type: text/csv; charset=utf-8` and `Content-Disposition: attachment; filename="transaksi-YYYY-MM-DD.csv"`.
+   - Return a 400 with an Indonesian message when `from > to`.
+   - **Completed 2026-10-30.** Added `lib/export.ts` (cell escaping, formula guard, BOM) and `listAllTransactions()` in `lib/data.ts` for chunked export reads.
+- [x] **4.2 UI components (`components/history/`)**
+   - `date-range-filter.tsx`: From/To date inputs synced to URL params; validation and "Reset" action.
+   - `export-csv-button.tsx`: triggers the route handler with the active filters; disabled when there are no rows.
+   - `history-table.tsx`: full ledger with sortable Date and Amount columns (URL `sort`/`dir` or client-side sort), pagination, and empty state.
+   - **Completed 2026-10-30.** Sorting is server-side (`sort=date|amount`, `dir=asc|desc`) and pagination preserves the active range and sort.
+- [x] **4.3 Page (`app/(dashboard)/histori/page.tsx`)**
+   - Read `from`, `to`, `page`, `sort`, `dir` from `searchParams`.
+   - Parallel fetch rows/count and category options if needed.
+   - Render header, date filter, export button, summary count, and table.
+   - Decide the overlap with `/transaksi`: `/transaksi` stays the quick month-based ledger; `/histori` focuses on arbitrary date ranges + export. Reuse table primitives where practical.
+   - **Completed 2026-10-30.** Missing/invalid dates default to the full ledger; a reversed range is normalized (swapped) before querying. Added `loading.tsx` and `error.tsx`.
+- [x] **4.4 XLSX export with native charts (extension, 2026-10-30)**
+   - `app/api/export/xlsx/route.ts`: same auth/range rules as CSV; streams a `.xlsx` attachment.
+   - `lib/export-xlsx.ts`: styled "Transaksi" sheet plus a "Ringkasan" sheet (cash-flow totals, expense-by-category, monthly trend) and native Excel pie/column charts.
+   - Uses `write-excel-file` (only `fflate`) for workbook generation and `chartsheet` (only `jszip`) for native chart parts. `exceljs` was evaluated and removed because it pulled deprecated transitive packages (`glob`, `inflight`, `rimraf`, `fstream`) and a moderate `uuid` advisory.
+   - `/histori` now shows both **Ekspor CSV** and **Ekspor XLSX** buttons.
 
 **Acceptance criteria**
-- [ ] Date range is inclusive on both ends.
-- [ ] Export contains only the authenticated user's rows and respects the active filters.
-- [ ] Excel opens the file with correct Indonesian characters and no mangled currency.
-- [ ] Sorting and pagination preserve active filters.
-- [ ] No CSV injection risk.
+- [x] Date range is inclusive on both ends.
+- [x] Export contains only the authenticated user's rows and respects the active filters.
+- [x] Excel opens the file with correct Indonesian characters and no mangled currency.
+- [x] Sorting and pagination preserve active filters.
+- [x] No CSV injection risk.
+- [x] XLSX opens without repair prompts and charts are native/editable.
+- [x] New export dependencies have no `npm audit` findings.
 
 **Edge cases**
 - Empty result → export disabled or a harmless header-only file.
@@ -433,31 +443,35 @@ flowchart TD
 - `app/(dashboard)/kategori/page.tsx`
 
 **Action plan**
-- [ ] **5.1 Server actions (`lib/actions/categories.ts`)**
-  - `createCategory`: parse with `categorySchema`; friendly duplicate-name message for the same kind.
-  - `updateCategory`: scope by `user_id`; block changing `kind` when transactions exist (otherwise historical analytics break).
-  - `deleteCategory`:
-    - Block `is_default = true` categories server-side, not only in the UI.
-    - For custom categories, reassign existing transactions to a fallback category of the same kind (prefer "Lain-lain" for expense / "Lainnya" for income / "Tabungan" for savings), then delete. If no fallback exists, block with an explanatory message.
-    - Note: budgets referencing the category cascade-delete; surface this in the confirmation.
-  - Revalidate `/kategori`, `/transaksi`, `/anggaran`, `/analisis`, `/dashboard`.
-- [ ] **5.2 UI components (`components/categories/`)**
-  - `category-dialog.tsx`: name, kind (create only), color palette from `CATEGORY_COLORS`, live preview, duplicate-name handling.
-  - `category-list.tsx`: grouped by Pengeluaran, Pemasukan, Tabungan; show color dot, name, transaction usage count, "Default" badge, edit/delete actions.
-  - `delete-category-dialog.tsx`: warning that existing transactions move to the fallback category and related budgets are removed.
-- [ ] **5.3 Page (`app/(dashboard)/kategori/page.tsx`)**
-  - Fetch categories and usage counts.
-  - Render groups, add button, empty state per group.
+- [x] **5.1 Server actions (`lib/actions/categories.ts`)**
+   - `createCategory`: parse with `categorySchema`; friendly duplicate-name message for the same kind.
+   - `updateCategory`: scope by `user_id`; block changing `kind` when transactions exist (otherwise historical analytics break).
+   - `deleteCategory`:
+     - Block `is_default = true` categories server-side, not only in the UI.
+     - For custom categories, reassign existing transactions to a fallback category of the same kind (prefer "Lain-lain" for expense / "Lainnya" for income / "Tabungan" for savings), then delete. If no fallback exists, block with an explanatory message.
+     - Note: budgets referencing the category cascade-delete; surface this in the confirmation.
+   - Revalidate `/kategori`, `/transaksi`, `/anggaran`, `/analisis`, `/dashboard`.
+   - **Completed 2026-10-30.** Kind changes are also blocked when budgets reference the category, not only transactions, so expense-only budget semantics stay valid.
+- [x] **5.2 UI components (`components/categories/`)**
+   - `category-dialog.tsx`: name, kind (create only), color palette from `CATEGORY_COLORS`, live preview, duplicate-name handling.
+   - `category-list.tsx`: grouped by Pengeluaran, Pemasukan, Tabungan; show color dot, name, transaction usage count, "Default" badge, edit/delete actions.
+   - `delete-category-dialog.tsx`: warning that existing transactions move to the fallback category and related budgets are removed.
+   - **Completed 2026-10-30.** Added `lib/category-labels.ts` for shared kind labels, descriptions, ordering, and fallback names.
+- [x] **5.3 Page (`app/(dashboard)/kategori/page.tsx`)**
+   - Fetch categories and usage counts.
+   - Render groups, add button, empty state per group.
+   - **Completed 2026-10-30.** Added `getCategoryUsageCounts()` in `lib/data.ts`, plus `loading.tsx` and `error.tsx`.
 
 **Acceptance criteria**
-- [ ] Default categories cannot be deleted from either UI or server action.
-- [ ] Custom category creation enforces unique name per kind.
-- [ ] Deleting a category never leaves transactions pointing to a deleted category (reassigned or blocked).
-- [ ] Category changes refresh transaction forms, budgets, and analytics.
+- [x] Default categories cannot be deleted from either UI or server action.
+- [x] Custom category creation enforces unique name per kind.
+- [x] Deleting a category never leaves transactions pointing to a deleted category (reassigned or blocked).
+- [x] Category changes refresh transaction forms, budgets, and analytics.
 
-**Decisions needed**
-- Whether default categories may be renamed/recolored (recommended: allow color changes, block rename and delete).
-- Fallback category behavior when the user deleted the default fallback.
+**Decisions (implemented 2026-10-30)**
+- Default categories can be recolored but cannot be renamed or deleted.
+- If the default fallback for a kind is missing, deletion is blocked with an explanatory message instead of orphaning transactions.
+- Deleting an expense category cascades its budgets; the confirmation dialog warns about this.
 
 ---
 
@@ -564,7 +578,7 @@ flowchart TD
 **Implemented 2026-10-28**: shared route skeleton, dashboard/transaksi skeletons, top progress bar, content fade-in with reduced-motion handling, and duplicate layout auth call removed.
 
 - [x] **Shared dashboard skeleton**: `app/(dashboard)/loading.tsx` keeps the shell visible and animates only the content area.
-- [x] **Route-specific skeletons**: `app/(dashboard)/dashboard/loading.tsx`, `transaksi/loading.tsx`, `anggaran/loading.tsx`, `tabungan/loading.tsx`, and `analisis/loading.tsx`; `/histori` and `/kategori` still reuse the shared skeleton until they get dedicated ones.
+- [x] **Route-specific skeletons**: `app/(dashboard)/dashboard/loading.tsx`, `transaksi/loading.tsx`, `anggaran/loading.tsx`, `tabungan/loading.tsx`, `analisis/loading.tsx`, and `histori/loading.tsx`; `/kategori` still reuses the shared skeleton until it gets a dedicated one.
 - [x] **Top navigation progress**: `components/layout/link-progress.tsx` uses `useLinkStatus()` inside each sidebar link to show a fixed top bar while navigation is pending.
 - [x] **Content transition**: `DashboardShell` keys the content wrapper by pathname and applies `animate-page-content`; `prefers-reduced-motion` disables it.
 - [ ] **Prefetch strategy**: keep sidebar `<Link>` prefetch enabled where safe and verify it does not trigger expensive `/dashboard` queries unnecessarily.
@@ -635,7 +649,7 @@ npm run build
 ```
 Both commands must exit with code `0`.
 
-**Last verified**: 2026-10-28 — `npm run lint` and `npm run build` both exited `0` after the P0 hardening, P1 Anggaran, P2 Tabungan, P3 Analisis, one-page loading experience, and chart tooltip fix.
+**Last verified**: 2026-10-30 — `npm run lint` and `npm run build` both exited `0` after the P0 hardening, P1 Anggaran, P2 Tabungan, P3 Analisis, P4 Histori (CSV + XLSX), one-page loading experience, and chart tooltip fix.
 
 Additional checks for database work:
 - Apply the migration to a fresh Supabase project and confirm no SQL errors.

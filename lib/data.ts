@@ -75,6 +75,26 @@ export async function listCategories(
   return (data as Category[]) ?? [];
 }
 
+/** Number of transactions referencing each category id. */
+export async function getCategoryUsageCounts(
+  client: Client,
+  categoryIds: string[],
+): Promise<Record<string, number>> {
+  if (categoryIds.length === 0) return {};
+
+  const entries = await Promise.all(
+    categoryIds.map(async (id) => {
+      const { count } = await client
+        .from("transactions")
+        .select("id", { count: "exact", head: true })
+        .eq("category_id", id);
+      return [id, count ?? 0] as const;
+    }),
+  );
+
+  return Object.fromEntries(entries);
+}
+
 // ---------------------------------------------------------------------------
 // Transactions
 // ---------------------------------------------------------------------------
@@ -87,8 +107,11 @@ export interface TxFilters {
   type?: TransactionType;
   categoryId?: string;
   search?: string;
+  userId?: string; // explicit scope for sensitive reads (e.g. CSV export)
   page?: number; // 0-based
   pageSize?: number;
+  sort?: "date" | "amount";
+  dir?: "asc" | "desc";
 }
 
 export async function listTransactions(
@@ -97,13 +120,24 @@ export async function listTransactions(
 ): Promise<{ rows: TransactionWithCategory[]; count: number }> {
   const pageSize = filters.pageSize ?? 20;
   const page = filters.page ?? 0;
+  const sortColumn = filters.sort === "amount" ? "amount" : "occurred_on";
+  const ascending = filters.dir === "asc";
 
-  let query = client
-    .from("transactions")
-    .select(TX_SELECT, { count: "exact" })
-    .order("occurred_on", { ascending: false })
-    .order("created_at", { ascending: false });
+  let query = client.from("transactions").select(TX_SELECT, { count: "exact" });
 
+  if (sortColumn === "amount") {
+    query = query
+      .order("amount", { ascending })
+      .order("occurred_on", { ascending: false })
+      .order("id", { ascending: true });
+  } else {
+    query = query
+      .order("occurred_on", { ascending })
+      .order("created_at", { ascending })
+      .order("id", { ascending: true });
+  }
+
+  if (filters.userId) query = query.eq("user_id", filters.userId);
   if (filters.month) {
     query = query
       .gte("occurred_on", awalBulan(filters.month))
@@ -126,6 +160,50 @@ export async function listTransactions(
     rows: (data as unknown as TransactionWithCategory[]) ?? [],
     count: count ?? 0,
   };
+}
+
+/**
+ * Every transaction matching the filters, paginated in 1,000-row chunks.
+ * Used by CSV export so the Supabase default cap never truncates results.
+ */
+export async function listAllTransactions(
+  client: Client,
+  filters: Omit<TxFilters, "page" | "pageSize" | "sort" | "dir"> = {},
+): Promise<TransactionWithCategory[]> {
+  const CHUNK = 1000;
+  const rows: TransactionWithCategory[] = [];
+
+  for (let offset = 0; ; offset += CHUNK) {
+    let query = client
+      .from("transactions")
+      .select(TX_SELECT)
+      .order("occurred_on", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (filters.userId) query = query.eq("user_id", filters.userId);
+    if (filters.month) {
+      query = query
+        .gte("occurred_on", awalBulan(filters.month))
+        .lte("occurred_on", akhirBulan(filters.month));
+    }
+    if (filters.from) query = query.gte("occurred_on", filters.from);
+    if (filters.to) query = query.lte("occurred_on", filters.to);
+    if (filters.type) query = query.eq("type", filters.type);
+    if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
+    if (filters.search) {
+      query = query.ilike("description", `%${filters.search}%`);
+    }
+
+    const { data, error } = await query.range(offset, offset + CHUNK - 1);
+    if (error) throw new Error(error.message);
+
+    const page = (data as unknown as TransactionWithCategory[]) ?? [];
+    rows.push(...page);
+    if (page.length < CHUNK) break;
+  }
+
+  return rows;
 }
 
 export async function listRecentTransactions(
