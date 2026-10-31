@@ -75,24 +75,40 @@ export async function listCategories(
   return (data as Category[]) ?? [];
 }
 
-/** Number of transactions referencing each category id. */
+/**
+ * Number of transactions referencing each category id.
+ * Reads category ids in 1,000-row chunks (no per-category N+1 query) and counts
+ * in memory, so usage totals stay accurate beyond the Supabase default cap.
+ */
 export async function getCategoryUsageCounts(
   client: Client,
   categoryIds: string[],
 ): Promise<Record<string, number>> {
   if (categoryIds.length === 0) return {};
 
-  const entries = await Promise.all(
-    categoryIds.map(async (id) => {
-      const { count } = await client
-        .from("transactions")
-        .select("id", { count: "exact", head: true })
-        .eq("category_id", id);
-      return [id, count ?? 0] as const;
-    }),
-  );
+  const CHUNK = 1000;
+  const counts: Record<string, number> = {};
+  for (const id of categoryIds) counts[id] = 0;
 
-  return Object.fromEntries(entries);
+  for (let offset = 0; ; offset += CHUNK) {
+    const { data, error } = await client
+      .from("transactions")
+      .select("category_id")
+      .in("category_id", categoryIds)
+      .order("id", { ascending: true })
+      .range(offset, offset + CHUNK - 1);
+
+    if (error) break;
+
+    const page =
+      (data as unknown as Array<{ category_id: string | null }>) ?? [];
+    for (const row of page) {
+      if (row.category_id) counts[row.category_id] += 1;
+    }
+    if (page.length < CHUNK) break;
+  }
+
+  return counts;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +220,63 @@ export async function listAllTransactions(
   }
 
   return rows;
+}
+
+export interface TransactionTotals {
+  income: number;
+  expense: number;
+  savings: number;
+}
+
+/**
+ * Sum income, expense, and savings for the *entire* filtered result set.
+ * Uses lean `type, amount` rows in 1,000-row chunks so paginated tables can
+ * still show correct summary stats.
+ */
+export async function getTransactionTotals(
+  client: Client,
+  filters: Omit<TxFilters, "page" | "pageSize" | "sort" | "dir"> = {},
+): Promise<TransactionTotals> {
+  const CHUNK = 1000;
+  const totals: TransactionTotals = { income: 0, expense: 0, savings: 0 };
+
+  for (let offset = 0; ; offset += CHUNK) {
+    let query = client
+      .from("transactions")
+      .select("type, amount")
+      .order("occurred_on", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (filters.userId) query = query.eq("user_id", filters.userId);
+    if (filters.month) {
+      query = query
+        .gte("occurred_on", awalBulan(filters.month))
+        .lte("occurred_on", akhirBulan(filters.month));
+    }
+    if (filters.from) query = query.gte("occurred_on", filters.from);
+    if (filters.to) query = query.lte("occurred_on", filters.to);
+    if (filters.type) query = query.eq("type", filters.type);
+    if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
+    if (filters.search) {
+      query = query.ilike("description", `%${filters.search}%`);
+    }
+
+    const { data, error } = await query.range(offset, offset + CHUNK - 1);
+    if (error) throw new Error(error.message);
+
+    const page =
+      (data as unknown as Array<{ type: TransactionType; amount: number }>) ??
+      [];
+    for (const row of page) {
+      const value = Number(row.amount);
+      if (row.type === "income") totals.income += value;
+      else if (row.type === "expense") totals.expense += value;
+      else if (row.type === "savings") totals.savings += value;
+    }
+    if (page.length < CHUNK) break;
+  }
+
+  return totals;
 }
 
 export async function listRecentTransactions(

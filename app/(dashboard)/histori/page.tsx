@@ -9,7 +9,7 @@ import { HistoryTable } from "@/components/history/history-table";
 
 export const metadata: Metadata = {
   title: "Histori",
-  description: "Telusuri seluruh transaksi dan ekspor data ke CSV.",
+  description: "Telusuri seluruh transaksi dan ekspor data ke CSV atau XLSX.",
 };
 
 const PAGE_SIZE = 25;
@@ -56,7 +56,7 @@ export default async function HistoriPage({ searchParams }: HistoriPageProps) {
             Histori
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Telusuri seluruh transaksi dan ekspor data ke CSV.
+            Telusuri seluruh transaksi dan ekspor data ke CSV atau XLSX.
           </p>
         </div>
 

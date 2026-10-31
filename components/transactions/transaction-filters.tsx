@@ -5,7 +5,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { Category } from "@/lib/types";
-import { rentangBulan, namaBulan, bulanIni } from "@/lib/format";
+import { rentangBulan, namaBulan, bulanIni, bulanValid } from "@/lib/format";
 import { SearchIcon, XIcon } from "lucide-react";
 
 interface TransactionFiltersProps {
@@ -57,10 +57,16 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
     currentMonth || currentType || currentCategory || currentSearch,
   );
 
-  // Month options for the past 12 months
+  // Month options for the past 12 months, plus the active filter when it is
+  // older than the rolling window so the control never renders blank.
   const monthOptions = React.useMemo(() => {
-    return rentangBulan(bulanIni(), 12).reverse();
-  }, []);
+    const options = rentangBulan(bulanIni(), 12).reverse();
+    const selected = bulanValid(currentMonth);
+    if (selected && !options.includes(selected)) {
+      options.unshift(selected);
+    }
+    return options;
+  }, [currentMonth]);
 
   // Filter category dropdown based on currentType if selected
   const availableCategories = React.useMemo(() => {
@@ -90,7 +96,7 @@ export function TransactionFilters({ categories }: TransactionFiltersProps) {
         {/* Month Filter */}
         <div className="min-w-[130px]">
           <select
-            value={currentMonth}
+            value={bulanValid(currentMonth) ?? ""}
             onChange={(e) => updateFilters({ month: e.target.value || null })}
             className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
           >

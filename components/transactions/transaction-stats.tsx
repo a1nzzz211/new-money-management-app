@@ -1,6 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { rupiah } from "@/lib/format";
-import type { TransactionWithCategory } from "@/lib/data";
 import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
@@ -9,21 +8,16 @@ import {
 } from "lucide-react";
 
 interface TransactionStatsProps {
-  transactions: TransactionWithCategory[];
+  income: number;
+  expense: number;
+  savings: number;
 }
 
-export function TransactionStats({ transactions }: TransactionStatsProps) {
-  let income = 0;
-  let expense = 0;
-  let savings = 0;
-
-  for (const t of transactions) {
-    const val = Number(t.amount);
-    if (t.type === "income") income += val;
-    else if (t.type === "expense") expense += val;
-    else if (t.type === "savings") savings += val;
-  }
-
+export function TransactionStats({
+  income,
+  expense,
+  savings,
+}: TransactionStatsProps) {
   const net = income - expense - savings;
 
   return (

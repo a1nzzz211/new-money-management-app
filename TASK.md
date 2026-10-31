@@ -505,10 +505,13 @@ flowchart TD
   - Confirm each sees only their own categories, transactions, budgets, goals, and contributions.
   - Attempt a direct query/action against the other user's row and confirm it is rejected.
   - Confirm the `monthly_summary` view respects RLS without exposing other users' rows.
-- [ ] **6.6 Deployment**
-  - Configure the same environment variables.
-  - Update Supabase Auth Site URL / Redirect URLs to the production origin.
-  - Verify Google login, callback, and logout in production.
+- [ ] **6.6 Deployment** — full checklist in `README.md` → “Deployment (Vercel)”.
+  - Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_SITE_URL` for both **Production** and **Preview**; `NEXT_PUBLIC_SITE_URL` must be the deployed origin with no trailing slash, then redeploy.
+  - Update Supabase Auth **Site URL** to the production origin and add `https://<domain>/auth/callback` to **Redirect URLs** (plus a preview wildcard if preview OAuth is needed).
+  - Keep the Google Cloud authorized redirect URI pointed at `https://<project-ref>.supabase.co/auth/v1/callback`; the Vercel domain is configured in Supabase.
+  - Apply `0002_hardening.sql` to the linked project before smoke testing.
+  - Verify Google login, callback, logout, protected-route redirects, and both exports in production.
+  - Account for Vercel's 4.5 MB Function response cap: large CSV/XLSX exports can return `413`; stream the export or cap the range if needed.
 
 **Acceptance criteria**
 - [x] Fresh sign-in seeds a profile and default categories.
@@ -520,21 +523,29 @@ flowchart TD
 
 ### 3.10 Priority 7 — Final QA & Release Checklist
 
-- [ ] **Verification commands**
+> **Audit run 2026-10-31** (production build + unauthenticated runtime):
+> - [x] **Verification commands**: `npm run lint` and `npm run build` both exit `0`.
+> - [x] **Route smoke test (unauthenticated)**: `/` and `/login` return `200`; every protected route (`/dashboard`, `/transaksi`, `/anggaran`, `/tabungan`, `/analisis`, `/histori`, `/kategori`) returns `307` to `/login`; `/auth/callback` without a code returns `307` to `/login?error=auth`.
+> - [x] **Export API auth**: `/api/export` and `/api/export/xlsx` now return JSON `401` for signed-out requests instead of an HTML redirect (proxy no longer intercepts `/api`).
+> - [x] **Code-level checks passed**: localization, empty/loading/error states, revalidation scopes, pagination, SQL constraints/RLS policies, and the CRUD action wiring were reviewed and corrected where needed (see notes below).
+> - [ ] **Authenticated runtime pass still required**: sign in with a real user and click through the CRUD matrix, the two-user RLS test (6.5), the 375/768/1280 px responsive pass, and CSV/XLSX download checks. These need a live session and cannot be automated from the repo.
+
+- [x] **Verification commands**
   - `npm run lint`
   - `npm run build`
   - Both must exit `0` with no warnings that indicate runtime problems.
-- [ ] **Route smoke test** (authenticated): `/dashboard`, `/transaksi`, `/anggaran`, `/tabungan`, `/analisis`, `/histori`, `/kategori`.
-- [ ] **Unauthenticated redirects**: protected routes redirect to `/login`; `/login`, `/`, `/auth/*` remain public.
-- [ ] **CRUD matrix**: create/edit/delete transaction, budget, goal, contribution, category; verify list, stats, and dashboard updates.
-- [ ] **Responsive check**: mobile drawer, tables, dialogs, charts at 375/768/1280 px.
-- [ ] **Localization check**: all new copy in Bahasa Indonesia; no raw ISO dates; all amounts use `rupiah()`.
-- [ ] **Empty/loading/error states** for every new page; add `loading.tsx` and `error.tsx` where beneficial.
-- [ ] **Revalidation matrix** verified after each mutation.
-- [ ] **Data integrity**: no orphan transactions/categories/budgets; contribution totals equal goal progress.
-- [ ] **Performance**: range queries paginate; no N+1 queries; indexes cover user/month lookups.
+- [x] **Route smoke test (unauthenticated)**: protected routes redirect to `/login`; `/login`, `/`, `/auth/*` remain public (verified 2026-10-31 against `npm run start`).
+- [ ] **Route smoke test (authenticated)**: `/dashboard`, `/transaksi`, `/anggaran`, `/tabungan`, `/analisis`, `/histori`, `/kategori` — pending a manual signed-in session.
+- [x] **Unauthenticated redirects**: verified via production server (`307` → `/login`); fixed `/api/*` to bypass the proxy so handlers return `401`.
+- [ ] **CRUD matrix**: create/edit/delete transaction, budget, goal, contribution, category; verify list, stats, and dashboard updates. Code paths and revalidation were verified statically; run once with a live session.
+- [ ] **Responsive check**: mobile drawer, tables, dialogs, charts at 375/768/1280 px — manual pass pending.
+- [x] **Localization check**: all copy is Bahasa Indonesia; dates use `tanggal()`/`tanggalPendek()`/`namaBulan()`; UI amounts use `rupiah()`. Raw ISO dates remain only in CSV payloads by design.
+- [x] **Empty/loading/error states**: added the missing `app/(dashboard)/dashboard/error.tsx` and `app/(dashboard)/transaksi/error.tsx`; every route now has `loading.tsx` and `error.tsx` (or the shared fallback).
+- [x] **Revalidation matrix** verified after each mutation. Fixed gaps: `transactions` now revalidates `/kategori` (usage counts) and `/tabungan` (unlinked contributions); `goals` revalidates `/kategori`; `categories` revalidates `/histori`.
+- [x] **Data integrity**: schema uses `on delete set null` for transactions and `on delete cascade` for budgets/contributions; category deletion reassigns to a same-kind fallback; `contribute_to_goal` writes the transaction + contribution atomically and auto-marks achieved. Runtime RLS check still tracked in 6.5.
+- [x] **Performance**: range/export queries paginate in 1,000-row chunks; removed the `/kategori` per-category N+1 query; `/transaksi` summary totals now cover the whole filtered range (not just the visible page) with chunked reads; indexes cover user/date, user/category, user/type, and user/month lookups.
+- [x] **Docs**: README covers routes, env setup, deployment, and limitations; this checklist records the audit state.
 - [ ] **Optional quality gate**: add Vitest for pure helpers (`lib/analytics.ts`, `lib/export.ts`, validation schemas) if the project accepts a test dependency.
-- [ ] **Docs**: update README/TASK.md with final routes, env setup, and known limitations.
 
 ---
 
@@ -554,6 +565,7 @@ flowchart TD
 | R10 | Month boundary/timezone inconsistency (`awalBulan` local vs `monthKeyMonthsAgo` UTC) | Off-by-one around midnight/month boundaries | Fixed in P0.4: range start now uses local `rentangBulan()`/`bulanIni()` helpers |
 | R11 | Re-running `create policy` fails | Migration re-run errors | Fixed with idempotent policy drops in `0001` and `0002_hardening.sql` |
 | R12 | `/dashboard` and `/transaksi` feel slower to navigate than `/anggaran` and `/tabungan` | Perceived navigation lag | Implemented 2026-10-28 in 3.12.2: shared/route skeletons, top progress bar, content transition, and one redundant auth call removed. Prefetch audit + timing measurements remain. |
+| R13 | Vercel caps Function response bodies at 4.5 MB | Large CSV/XLSX exports fail with `413 FUNCTION_PAYLOAD_TOO_LARGE` | Documented in README deployment checklist; stream export or cap the date range if this becomes a real workload. |
 
 ---
 
@@ -649,7 +661,7 @@ npm run build
 ```
 Both commands must exit with code `0`.
 
-**Last verified**: 2026-10-30 — `npm run lint` and `npm run build` both exited `0` after the P0 hardening, P1 Anggaran, P2 Tabungan, P3 Analisis, P4 Histori (CSV + XLSX), one-page loading experience, and chart tooltip fix.
+**Last verified**: 2026-10-31 — `npm run lint` and `npm run build` both exited `0` after the Final QA fixes (export API auth, `/transaksi` filtered totals + month validation + page clamping, category usage N+1 removal, revalidation gaps, and missing error boundaries). Production-server smoke test confirmed public routes return `200`, protected routes redirect with `307`, and export APIs return JSON `401` when signed out.
 
 Additional checks for database work:
 - Apply the migration to a fresh Supabase project and confirm no SQL errors.

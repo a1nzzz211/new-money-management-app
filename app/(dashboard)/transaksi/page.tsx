@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { listTransactions, listCategories } from "@/lib/data";
+import {
+  getTransactionTotals,
+  listTransactions,
+  listCategories,
+} from "@/lib/data";
+import { bulanValid } from "@/lib/format";
 import { TransactionStats } from "@/components/transactions/transaction-stats";
 import { TransactionFilters } from "@/components/transactions/transaction-filters";
 import { TransactionTable } from "@/components/transactions/transaction-table";
@@ -31,23 +36,41 @@ export default async function TransaksiPage({ searchParams }: TransaksiPageProps
     ? (params.type as TransactionType)
     : undefined;
 
-  const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+  const requestedPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+
+  // Ignore invalid `month` values instead of passing them to date helpers.
+  const filters = {
+    month: bulanValid(params.month) ?? undefined,
+    type: typeFilter,
+    categoryId: params.categoryId || undefined,
+    search: params.search || undefined,
+  };
 
   const supabase = await createClient();
 
-  // Fetch categories and transactions in parallel
-  const [categories, { rows: transactions, count: totalCount }] =
-    await Promise.all([
-      listCategories(supabase),
-      listTransactions(supabase, {
-        month: params.month || undefined,
-        type: typeFilter,
-        categoryId: params.categoryId || undefined,
-        search: params.search || undefined,
-        page: page - 1,
-        pageSize: PAGE_SIZE,
-      }),
-    ]);
+  // Fetch categories, the visible page, and full-range totals in parallel.
+  const [categories, pageResult, totals] = await Promise.all([
+    listCategories(supabase),
+    listTransactions(supabase, {
+      ...filters,
+      page: requestedPage - 1,
+      pageSize: PAGE_SIZE,
+    }),
+    getTransactionTotals(supabase, filters),
+  ]);
+
+  // If the requested page is past the end (e.g. after deleting rows), land on
+  // the last valid page instead of showing a misleading empty state.
+  let { rows: transactions, count: totalCount } = pageResult;
+  let page = requestedPage;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  if (transactions.length === 0 && totalCount > 0 && page > totalPages) {
+    page = totalPages;
+    ({ rows: transactions, count: totalCount } = await listTransactions(
+      supabase,
+      { ...filters, page: page - 1, pageSize: PAGE_SIZE },
+    ));
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,7 +85,7 @@ export default async function TransaksiPage({ searchParams }: TransaksiPageProps
       </div>
 
       {/* Summary Stats */}
-      <TransactionStats transactions={transactions} />
+      <TransactionStats {...totals} />
 
       {/* Filter Bar */}
       <TransactionFilters categories={categories} />

@@ -79,15 +79,19 @@ const REVALIDATE_PATHS: Record<FinanceScope, string[]> = {
     "/anggaran",
     "/analisis",
     "/histori",
+    // Usage counts and "unlinked contribution" badges depend on transactions.
+    "/kategori",
+    "/tabungan",
   ],
   budgets: ["/anggaran", "/dashboard", "/analisis"],
-  goals: ["/tabungan", "/dashboard", "/analisis", "/transaksi"],
+  goals: ["/tabungan", "/dashboard", "/analisis", "/transaksi", "/kategori"],
   categories: [
     "/kategori",
     "/transaksi",
     "/anggaran",
     "/analisis",
     "/dashboard",
+    "/histori",
   ],
 };
 

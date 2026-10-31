@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/"];
+// `/api` is public at the proxy level so route handlers can return their own
+// JSON 401 instead of an HTML redirect to /login.
+const PUBLIC_PATHS = ["/login", "/auth", "/", "/api"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
