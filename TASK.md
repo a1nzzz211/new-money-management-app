@@ -97,13 +97,13 @@ These helpers already existed and are consumed by the dashboard. Budget and goal
 
 | Module | Route | Status | Foundation present | Main blockers |
 |---|---|---|---|---|
-| Cross-cutting hardening | — | 🟢 Complete | P0.1–P0.6 implemented; `0002_hardening.sql` pending apply to existing project | None for app code |
+| Cross-cutting hardening | — | 🟢 Complete | P0.1–P0.6 implemented; `0002_hardening.sql` applied 2026-10-31 | None for app code |
 | Anggaran | `/anggaran` | 🟢 Built | Actions, UI, page, month picker, revalidation | None |
 | Tabungan | `/tabungan` | 🟢 Built | Actions, contribution UI, status tabs, page | None |
 | Analisis | `/analisis` | 🟢 Built | Range-aware queries, adherence helper, Recharts, page | None |
 | Histori, CSV & XLSX | `/histori` | 🟢 Built | Sortable range queries, CSV/XLSX helpers, export routes | None |
 | Kategori | `/kategori` | 🟢 Built | Actions, grouped UI, usage counts, fallback reassignment | None |
-| Supabase production | — | 🟡 Local configured | Migration applied; Google OAuth working | RLS two-user test and production deployment pending |
+| Supabase production | — | 🟢 Deployed | `0001` + `0002` applied; Google OAuth working; Vercel production live at `new-money-management-app-vercel.vercel.app` | RLS two-user test (6.5) pending |
 
 ### 3.2 Execution Order, Dependencies & Definition of Done
 
@@ -480,7 +480,7 @@ flowchart TD
 **Goal**: Connect the app to a live Supabase backend and verify auth, schema, and RLS end-to-end.
 
 - [x] **6.1 Migration** — `0001_init.sql` applied 2026-10-27 to the linked project.
-  - `0002_hardening.sql` was added 2026-10-28 for the already-provisioned project; apply it via Supabase SQL Editor or `supabase db push` before further DB testing.
+  - `0002_hardening.sql` was added 2026-10-28 for the already-provisioned project and **applied 2026-10-31** via the Supabase SQL Editor.
   - Fresh projects can run `0001_init.sql` directly (it contains the hardened definitions), then run `0002_hardening.sql` idempotently.
   - Verify tables: `profiles`, `categories`, `transactions`, `budgets`, `savings_goals`, `goal_contributions`.
   - Verify the `monthly_summary` view uses `security_invoker = true`.
@@ -506,6 +506,7 @@ flowchart TD
   - Attempt a direct query/action against the other user's row and confirm it is rejected.
   - Confirm the `monthly_summary` view respects RLS without exposing other users' rows.
 - [ ] **6.6 Deployment** — full checklist in `README.md` → “Deployment (Vercel)”.
+  - **2026-10-31:** production deployed at `https://new-money-management-app-vercel.vercel.app`; active repo is `a1nzzz211/new-money-management-app-vercel` (auto-deploy on `main`); `0002_hardening.sql` applied. Unauthenticated smoke passed (`/` and `/login` 200, protected routes 307, export APIs 401). Logged-in OAuth, CRUD, exports, and RLS checks remain.
   - Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_SITE_URL` for both **Production** and **Preview**; `NEXT_PUBLIC_SITE_URL` must be the deployed origin with no trailing slash, then redeploy.
   - Update Supabase Auth **Site URL** to the production origin and add `https://<domain>/auth/callback` to **Redirect URLs** (plus a preview wildcard if preview OAuth is needed).
   - Keep the Google Cloud authorized redirect URI pointed at `https://<project-ref>.supabase.co/auth/v1/callback`; the Vercel domain is configured in Supabase.
@@ -527,6 +528,7 @@ flowchart TD
 > - [x] **Verification commands**: `npm run lint` and `npm run build` both exit `0`.
 > - [x] **Route smoke test (unauthenticated)**: `/` and `/login` return `200`; every protected route (`/dashboard`, `/transaksi`, `/anggaran`, `/tabungan`, `/analisis`, `/histori`, `/kategori`) returns `307` to `/login`; `/auth/callback` without a code returns `307` to `/login?error=auth`.
 > - [x] **Export API auth**: `/api/export` and `/api/export/xlsx` now return JSON `401` for signed-out requests instead of an HTML redirect (proxy no longer intercepts `/api`).
+> - [x] **Production deployment (2026-10-31)**: live at `https://new-money-management-app-vercel.vercel.app` from repo `a1nzzz211/new-money-management-app-vercel` (commit `8bc422d`). Verified on production: `/login` and `/` return `200`; all protected routes return `307` → `/login`; `/api/export` returns JSON `401`. The previous `500 INTERNAL_SERVER_ERROR` is resolved.
 > - [x] **Code-level checks passed**: localization, empty/loading/error states, revalidation scopes, pagination, SQL constraints/RLS policies, and the CRUD action wiring were reviewed and corrected where needed (see notes below).
 > - [ ] **Authenticated runtime pass still required**: sign in with a real user and click through the CRUD matrix, the two-user RLS test (6.5), the 375/768/1280 px responsive pass, and CSV/XLSX download checks. These need a live session and cannot be automated from the repo.
 
@@ -534,7 +536,7 @@ flowchart TD
   - `npm run lint`
   - `npm run build`
   - Both must exit `0` with no warnings that indicate runtime problems.
-- [x] **Route smoke test (unauthenticated)**: protected routes redirect to `/login`; `/login`, `/`, `/auth/*` remain public (verified 2026-10-31 against `npm run start`).
+- [x] **Route smoke test (unauthenticated)**: protected routes redirect to `/login`; `/login`, `/`, `/auth/*` remain public (verified 2026-10-31 against `npm run start` and the production deployment).
 - [ ] **Route smoke test (authenticated)**: `/dashboard`, `/transaksi`, `/anggaran`, `/tabungan`, `/analisis`, `/histori`, `/kategori` — pending a manual signed-in session.
 - [x] **Unauthenticated redirects**: verified via production server (`307` → `/login`); fixed `/api/*` to bypass the proxy so handlers return `401`.
 - [ ] **CRUD matrix**: create/edit/delete transaction, budget, goal, contribution, category; verify list, stats, and dashboard updates. Code paths and revalidation were verified statically; run once with a live session.
@@ -553,7 +555,7 @@ flowchart TD
 
 | ID | Risk / gap | Impact | Mitigation / decision |
 |---|---|---|---|
-| R1 | `0001_init.sql` uses `day(month)`, expression inside a unique table constraint, and RLS on a view | Migration fails on a fresh project | Fixed in P0.5; `0002_hardening.sql` covers already-provisioned projects (pending apply) |
+| R1 | `0001_init.sql` uses `day(month)`, expression inside a unique table constraint, and RLS on a view | Migration fails on a fresh project | Fixed in P0.5; `0002_hardening.sql` applied to the provisioned project 2026-10-31 |
 | R2 | Nav links to unbuilt routes | 404s in deployed app | Resolved in P0.6 with "Segera Hadir" placeholders |
 | R3 | `savingsRate` is actually net margin | Misleading dashboard/analytics metric | Fixed in P0.4: `savingsRate = savings/income`, `netMargin = net/income` |
 | R4 | `budgetStatuses` treats exactly 100% as over budget | Wrong "Melebihi Batas" label | Fixed in P0.4: `over = spent > limit`; 100% is `warning` |
@@ -661,7 +663,7 @@ npm run build
 ```
 Both commands must exit with code `0`.
 
-**Last verified**: 2026-10-31 — `npm run lint` and `npm run build` both exited `0` after the Final QA fixes (export API auth, `/transaksi` filtered totals + month validation + page clamping, category usage N+1 removal, revalidation gaps, and missing error boundaries). Production-server smoke test confirmed public routes return `200`, protected routes redirect with `307`, and export APIs return JSON `401` when signed out.
+**Last verified**: 2026-10-31 — `npm run lint` and `npm run build` both exited `0` after the Final QA fixes (export API auth, `/transaksi` filtered totals + month validation + page clamping, category usage N+1 removal, revalidation gaps, and missing error boundaries). Production deployment at `https://new-money-management-app-vercel.vercel.app` returns `200` for public routes, `307` redirects for protected routes, and JSON `401` for export APIs when signed out; the earlier `500` is resolved. Authenticated OAuth/CRUD/RLS verification is still pending.
 
 Additional checks for database work:
 - Apply the migration to a fresh Supabase project and confirm no SQL errors.

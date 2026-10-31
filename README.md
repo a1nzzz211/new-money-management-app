@@ -59,8 +59,8 @@ All dashboard routes are protected by `proxy.ts` and redirect to `/login` when s
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/a1nzzz211/new-money-management-app.git
-cd new-money-management-app
+git clone https://github.com/a1nzzz211/new-money-management-app-vercel.git
+cd new-money-management-app-vercel
 npm install
 ```
 
@@ -103,6 +103,9 @@ If you access the dev server through a VS Code/Codespaces tunnel, set `NEXT_PUBL
 
 ## Deployment (Vercel)
 
+Production deployment: **https://new-money-management-app-vercel.vercel.app**  
+Active Git repository: `a1nzzz211/new-money-management-app-vercel` (connected to the Vercel project, so pushes to `main` auto-deploy). The original `a1nzzz211/new-money-management-app` repository is superseded.
+
 Before deploying, complete this checklist:
 
 1. **Environment variables** (Vercel → Project Settings → Environment Variables, for **Production** and **Preview**):
@@ -120,7 +123,7 @@ Before deploying, complete this checklist:
 3. **Google OAuth**: keep the Supabase callback `https://<project-ref>.supabase.co/auth/v1/callback` in Google Cloud Console → Credentials → Authorized redirect URIs. The Vercel domain is configured only in Supabase, not in Google Cloud.
 4. **Database migrations**:
    - Fresh project: run `supabase/migrations/0001_init.sql`.
-   - Existing project: run `supabase/migrations/0002_hardening.sql` (safe to re-run). This is still pending in `TASK.md`.
+   - Existing project: run `supabase/migrations/0002_hardening.sql` (safe to re-run). Applied to the production project on 2026-10-31.
 5. **Export size limit**: Vercel caps Function request/response bodies at **4.5 MB**. CSV/XLSX exports build the whole file in memory, so very large date ranges can fail with `413 FUNCTION_PAYLOAD_TOO_LARGE`. Keep ranges reasonable or switch the export handlers to streaming if large exports are required.
 6. **Verify after deploy**:
    - Google sign-in, callback to `/auth/callback`, and logout.
